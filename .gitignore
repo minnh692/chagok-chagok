@@ -1,0 +1,33 @@
+# Gradle / build
+.gradle/
+build/
+/captures
+.externalNativeBuild
+.cxx
+.kotlin/
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.navigation/
+
+# Local machine config (SDK path)
+local.properties
+
+# Signing & credentials (CRN, keys, tokens) - never commit
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+*.secrets
+credentials/
+.env
+.env.*
+
+# Debug artifacts
+debug-screens/
+*.hprof
+
+# OS
+.DS_Store
+Thumbs.db
