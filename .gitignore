@@ -31,3 +31,6 @@ debug-screens/
 # OS
 .DS_Store
 Thumbs.db
+
+# Downloaded raw data (large, re-downloadable)
+data/raw/
