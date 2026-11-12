@@ -1,6 +1,12 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.ksp)
+}
+
+ksp {
+  // Exported schema is committed so tests can check that no coordinate or time column ever appears.
+  arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 android {
@@ -52,6 +58,10 @@ dependencies {
   // Pleos Connect SDK
   implementation(libs.pleos.navihelper)
   implementation(libs.pleos.vehicle)
+
+  // Local storage
+  implementation(libs.androidx.room.runtime)
+  ksp(libs.androidx.room.compiler)
 
   testImplementation(libs.junit)
 }
