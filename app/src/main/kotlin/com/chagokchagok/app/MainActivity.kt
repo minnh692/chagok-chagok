@@ -14,7 +14,18 @@ import com.chagokchagok.app.ui.next.NextStampScreen
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import com.chagokchagok.app.ui.theme.Palette
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,7 +101,18 @@ class MainActivity : ComponentActivity() {
           DrivingBlockScreen(geometry, fillColors(mapFills(book, MapFilter.MINE)))
           return@ChagokChagokTheme
         }
-        when (screen) {
+        // Screens slide in from the side they lead to (deeper to the right) and cross-fade.
+        AnimatedContent(
+          targetState = screen,
+          modifier = Modifier.fillMaxSize().background(Palette.Panel),
+          transitionSpec = {
+            val dir = if (depth(targetState) >= depth(initialState)) 1 else -1
+            (slideInHorizontally(tween(320)) { dir * it / 8 } + fadeIn(tween(260)))
+              .togetherWith(slideOutHorizontally(tween(320)) { -dir * it / 12 } + fadeOut(tween(200)))
+          },
+          label = "screen",
+        ) { shown ->
+        when (shown) {
           Screen.CONSENT -> ConsentScreen(onAccept = ::acceptConsent, onLater = vm::declineConsent)
           Screen.TODAY -> HomeScreen(
             regions = regions,
@@ -141,8 +163,15 @@ class MainActivity : ComponentActivity() {
             onBack = { vm.back() },
           )
         }
+        }
       }
     }
+  }
+
+  private fun depth(screen: Screen) = when (screen) {
+    Screen.CONSENT, Screen.TODAY -> 0
+    Screen.MY_MAP -> 1
+    Screen.NEXT -> 2
   }
 
   override fun onStart() {

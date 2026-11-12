@@ -1,5 +1,7 @@
 package com.chagokchagok.app.ui.home
 
+import com.chagokchagok.app.ui.components.enterOnce
+import com.chagokchagok.app.ui.components.animatedCount
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -155,16 +157,16 @@ fun HomeScreen(
       }
       if (missed.isNotEmpty()) {
         Spacer(Modifier.height(16.dp))
-        MissedStampsCard(missed, regions, today, onStampMissed, onDismissMissed)
+        MissedStampsCard(missed, regions, today, onStampMissed, onDismissMissed, Modifier.enterOnce("missed"))
       }
       completions.firstOrNull()?.let { c ->
         Spacer(Modifier.height(16.dp))
-        CompletionCard(c, onDismiss = { onDismissCompletion(c.id) })
+        CompletionCard(c, onDismiss = { onDismissCompletion(c.id) }, modifier = Modifier.enterOnce(c.id))
       }
       // In a split the other window is usually the navigation already, so the nudge is only for full width.
       if (naviPrompt && wide) {
         Spacer(Modifier.height(16.dp))
-        NaviPromptCard(onOpenNavi = onOpenNavi, onDismiss = onDismissNavi)
+        NaviPromptCard(onOpenNavi = onOpenNavi, onDismiss = onDismissNavi, modifier = Modifier.enterOnce("navi", delayMs = 150))
       }
       Spacer(Modifier.height(28.dp))
       TodayStampList(book, regions)
@@ -218,7 +220,7 @@ private fun MapHeader(count: Int, regionCount: Int, filter: MapFilter, today: Lo
   Column(modifier) {
     Text("${eyebrowDate(today)}  ·  CHAGOK CHAGOK", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text("$count STAMPS", style = MaterialTheme.typography.displaySmall.copy(letterSpacing = 1.sp), color = Palette.Text)
+    Text("${animatedCount(count)} STAMPS", style = MaterialTheme.typography.displaySmall.copy(letterSpacing = 1.sp), color = Palette.Text)
     Spacer(Modifier.height(4.dp))
     Text(
       "$scope ${regionCount}곳 중 ${count}곳",

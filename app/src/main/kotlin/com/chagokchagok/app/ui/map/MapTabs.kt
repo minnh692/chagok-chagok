@@ -1,6 +1,15 @@
 package com.chagokchagok.app.ui.map
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import com.chagokchagok.app.ui.components.interaction
+import com.chagokchagok.app.ui.components.pressScale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.chagokchagok.app.ui.theme.MinTouch
 import com.chagokchagok.app.ui.theme.Palette
 
+private val TabShape = RoundedCornerShape(36.dp)
+
 /** Tabs over the map: 나의 지도 / 우리 가족 / 연인 / 친구. */
 @Composable
 fun MapTabs(selected: MapFilter, onSelect: (MapFilter) -> Unit, modifier: Modifier = Modifier) {
@@ -32,21 +43,32 @@ fun MapTabs(selected: MapFilter, onSelect: (MapFilter) -> Unit, modifier: Modifi
   ) {
     MapFilter.entries.forEach { filter ->
       val isSelected = filter == selected
+      val source = remember { MutableInteractionSource() }
+      val state = source.interaction()
+      val fill by animateColorAsState(
+        when {
+          isSelected -> Palette.Primary
+          state.pressed -> Palette.Primary.copy(alpha = 0.35f)
+          state.hovered -> Palette.Primary.copy(alpha = 0.18f)
+          else -> Palette.Primary.copy(alpha = 0f)
+        },
+        tween(180),
+        label = "tabFill",
+      )
+      val text by animateColorAsState(if (isSelected) Palette.OnPrimary else Palette.Text, tween(180), label = "tabText")
       Box(
         modifier = Modifier
           .heightIn(min = MinTouch)
           .widthIn(min = 120.dp)
-          .background(if (isSelected) Palette.Primary else Palette.Panel.copy(alpha = 0f), RoundedCornerShape(36.dp))
+          .pressScale(state)
+          .clip(TabShape)
+          .background(fill, TabShape)
           .semantics { this.selected = isSelected }
-          .clickable(role = Role.Tab) { onSelect(filter) }
+          .clickable(interactionSource = source, indication = ripple(), role = Role.Tab) { onSelect(filter) }
           .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
       ) {
-        Text(
-          filter.label,
-          style = MaterialTheme.typography.labelLarge,
-          color = if (isSelected) Palette.OnPrimary else Palette.Text,
-        )
+        Text(filter.label, style = MaterialTheme.typography.labelLarge, color = text)
       }
     }
   }

@@ -1,5 +1,7 @@
 package com.chagokchagok.app.ui.next
 
+import com.chagokchagok.app.ui.components.enterOnce
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -143,7 +145,7 @@ private fun Note(title: String, body: String) {
 
 @Composable
 private fun Candidate(number: Int, n: NextStamp, onGuide: () -> Unit) {
-  Column(Modifier.fillMaxWidth().background(Palette.Card, RoundedCornerShape(20.dp)).padding(20.dp)) {
+  Column(Modifier.enterOnce(n.region.code, delayMs = (number - 1) * 90).fillMaxWidth().background(Palette.Card, RoundedCornerShape(20.dp)).padding(20.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Box(Modifier.size(36.dp).background(Palette.Primary, CircleShape), contentAlignment = Alignment.Center) {
         Text("$number", style = MaterialTheme.typography.titleMedium, color = Palette.OnPrimary)
@@ -188,7 +190,7 @@ private fun Tag(text: String, strong: Boolean) {
 /** C3: what a stamp there collects and how the hand-off went, with "다시 보내기". */
 @Composable
 private fun Confirm(n: NextStamp, total: Int, handoff: Handoff, onCancel: () -> Unit, onStart: () -> Unit, onDone: () -> Unit) {
-  Column(Modifier.fillMaxWidth().background(Palette.Card, RoundedCornerShape(20.dp)).padding(24.dp)) {
+  Column(Modifier.enterOnce(n.region.code).fillMaxWidth().animateContentSize().background(Palette.Card, RoundedCornerShape(20.dp)).padding(24.dp)) {
     Text("NAVI · 목적지 확인", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(6.dp))
     Text(n.region.name, style = MaterialTheme.typography.headlineMedium, color = Palette.Text)

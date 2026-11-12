@@ -1,5 +1,11 @@
 package com.chagokchagok.app.ui.today
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -59,8 +65,11 @@ fun CollectionChips(progress: List<CollectionProgress>, modifier: Modifier = Mod
 
 @Composable
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
+  // Fills from empty when first shown, then eases to each new value.
+  val shown = remember { Animatable(0f) }
+  LaunchedEffect(fraction) { shown.animateTo(fraction.coerceIn(0f, 1f), tween(700, easing = FastOutSlowInEasing)) }
   Box(modifier.clip(CircleShape).background(Palette.Panel)) {
-    Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).background(Palette.Primary, CircleShape))
+    Box(Modifier.fillMaxWidth(shown.value).height(6.dp).background(Palette.Primary, CircleShape))
   }
 }
 

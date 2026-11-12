@@ -1,5 +1,6 @@
 package com.chagokchagok.app.ui.today
 
+import com.chagokchagok.app.ui.components.stampIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -98,7 +99,10 @@ private fun ResultCard(done: CheckIn.Done, modifier: Modifier) {
   ) {
     Text("PARKED", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+    Text(
+      badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp,
+      modifier = Modifier.stampIn(done),
+    )
     Spacer(Modifier.height(8.dp))
     Text(line, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal), color = Palette.TextSecondary)
   }
@@ -125,7 +129,10 @@ private fun RestStopCard(stop: CheckIn.RestStop, modifier: Modifier) {
   ) {
     Text("REST AREA  ·  ${stop.area.routeName}", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+    Text(
+      badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp,
+      modifier = Modifier.stampIn(stop),
+    )
     Spacer(Modifier.height(8.dp))
     Text(line, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal), color = Palette.Text)
     Spacer(Modifier.height(4.dp))

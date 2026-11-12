@@ -1,6 +1,12 @@
 package com.chagokchagok.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,28 +37,57 @@ val ButtonShape = RoundedCornerShape(14.dp)
 
 private val ButtonPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
 
-/** Main action ("stamp" red). */
+private val ColorSpec = tween<Color>(140)
+
+/** Main action ("stamp" red). Brightens on hover, darkens and shrinks while pressed. */
 @Composable
 fun StampButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  val source = remember { MutableInteractionSource() }
+  val state = source.interaction()
+  val container by animateColorAsState(
+    when {
+      state.pressed -> lerp(Palette.Primary, Color.Black, 0.18f)
+      state.hovered -> lerp(Palette.Primary, Color.White, 0.12f)
+      else -> Palette.Primary
+    },
+    ColorSpec,
+    label = "stampButton",
+  )
   Button(
     onClick = onClick,
-    modifier = modifier.heightIn(min = MinTouch),
+    modifier = modifier.heightIn(min = MinTouch).pressScale(state),
     shape = ButtonShape,
     contentPadding = ButtonPadding,
-    colors = ButtonDefaults.buttonColors(containerColor = Palette.Primary, contentColor = Palette.OnPrimary),
+    interactionSource = source,
+    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, hoveredElevation = 6.dp),
+    colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = Palette.OnPrimary),
   ) { Text(label, style = MaterialTheme.typography.labelLarge) }
 }
 
-/** Secondary action: card fill with a thin outline. */
+/** Secondary action: card fill with a thin outline that turns stamp-red on hover and press. */
 @Composable
 fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  val source = remember { MutableInteractionSource() }
+  val state = source.interaction()
+  val active = state.hovered || state.pressed
+  val border by animateColorAsState(if (active) Palette.Primary else Palette.Outline, ColorSpec, label = "ghostBorder")
+  val container by animateColorAsState(
+    when {
+      state.pressed -> Palette.Panel
+      state.hovered -> lerp(Palette.Card, Palette.Primary, 0.08f)
+      else -> Palette.Card
+    },
+    ColorSpec,
+    label = "ghostFill",
+  )
   Button(
     onClick = onClick,
-    modifier = modifier.heightIn(min = MinTouch),
+    modifier = modifier.heightIn(min = MinTouch).pressScale(state),
     shape = ButtonShape,
     contentPadding = ButtonPadding,
-    border = BorderStroke(1.5.dp, Palette.Outline),
-    colors = ButtonDefaults.buttonColors(containerColor = Palette.Card, contentColor = Palette.Text),
+    interactionSource = source,
+    border = BorderStroke(1.5.dp, border),
+    colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = Palette.Text),
   ) { Text(label, style = MaterialTheme.typography.labelLarge) }
 }
 

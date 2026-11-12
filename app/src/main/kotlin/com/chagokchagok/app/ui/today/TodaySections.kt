@@ -3,6 +3,18 @@ package com.chagokchagok.app.ui.today
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.material3.ripple
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.lerp
+import com.chagokchagok.app.ui.components.Interaction
+import com.chagokchagok.app.ui.components.interaction
+import com.chagokchagok.app.ui.components.pressScale
+import com.chagokchagok.app.ui.components.popOn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -114,14 +126,32 @@ fun CompanionChips(
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       CompanionType.entries.forEach { type ->
         val isSelected = type == selected
+        val source = remember { MutableInteractionSource() }
+        val state = source.interaction()
+        val active = enabled && (state.hovered || state.pressed)
+        val fill by animateColorAsState(
+          when {
+            isSelected -> Palette.Primary
+            active -> lerp(Palette.Card, Palette.Primary, 0.12f)
+            else -> Palette.Card
+          },
+          tween(160),
+          label = "chipFill",
+        )
+        val edge by animateColorAsState(if (isSelected || active) Palette.Primary else Palette.Outline, tween(160), label = "chipEdge")
         Box(
           modifier = Modifier
             .weight(1f)
             .heightIn(min = MinTouch)
-            .background(if (isSelected) Palette.Primary else Palette.Card, CircleShape)
-            .border(1.5.dp, if (isSelected) Palette.Primary else Palette.Outline, CircleShape)
+            .pressScale(if (enabled) state else Interaction(false, false))
+            .popOn(isSelected)
+            .clip(CircleShape)
+            .background(fill, CircleShape)
+            .border(1.5.dp, edge, CircleShape)
             .semantics { this.selected = isSelected }
-            .clickable(enabled = enabled, role = Role.Button) { onSelect(if (isSelected) null else type) },
+            .clickable(interactionSource = source, indication = ripple(), enabled = enabled, role = Role.Button) {
+              onSelect(if (isSelected) null else type)
+            },
           contentAlignment = Alignment.Center,
         ) {
           Text(

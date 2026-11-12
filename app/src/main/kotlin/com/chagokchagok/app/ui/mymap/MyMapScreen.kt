@@ -1,5 +1,13 @@
 package com.chagokchagok.app.ui.mymap
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import com.chagokchagok.app.ui.components.animatedCount
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -119,7 +127,17 @@ fun MyMapScreen(
     Column(modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
       Text("선택한 지역", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
       Spacer(Modifier.height(12.dp))
-      if (detail == null) SelectHint() else RegionDetailCard(detail)
+      // A newly selected region cross-fades in and the panel resizes smoothly.
+      AnimatedContent(
+        targetState = detail,
+        contentKey = { it?.code },
+        transitionSpec = {
+          (fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 10 })
+            .togetherWith(fadeOut(tween(120)))
+            .using(SizeTransform(clip = false))
+        },
+        label = "regionDetail",
+      ) { d -> if (d == null) SelectHint() else RegionDetailCard(d) }
       Spacer(Modifier.height(16.dp))
       StampButton("다음 도장 추천", onOpenNext, Modifier.fillMaxWidth())
       Spacer(Modifier.height(28.dp))
@@ -170,7 +188,7 @@ private fun Header(count: Int, regionCount: Int, modifier: Modifier) {
   Column(modifier) {
     Text("MY KOREA  ·  CHAGOK MAP", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text("$count STAMPS", style = MaterialTheme.typography.displaySmall.copy(letterSpacing = 1.sp), color = Palette.Text)
+    Text("${animatedCount(count)} STAMPS", style = MaterialTheme.typography.displaySmall.copy(letterSpacing = 1.sp), color = Palette.Text)
     Spacer(Modifier.height(4.dp))
     Text(
       "전국 시·군·구 ${regionCount}곳 중 ${count}곳 · $percent%",
