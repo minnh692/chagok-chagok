@@ -96,7 +96,9 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 
 ## Project rules
 
-- Store only the region (si/gun/gu) and the date. Never persist raw coordinates or exact times.
+- Stored fields: region code, date (yyyy-MM-dd), order within the day, companion, memo; P1 adds rest-area id + date,
+  the chosen next-stamp destination (region code only) and salted SHA-256 hashes of seen navigation destinations.
+  Never persist coordinates, routes, or times of day.
 - No UI while driving: the activity IS declared `distractionOptimized` (so our own notice shows instead of the
   system blocking screen). While CarUxRestrictions require distraction optimization the whole UI is replaced by
   a static notice that consumes all input; restricted is the default until the car service reports otherwise
