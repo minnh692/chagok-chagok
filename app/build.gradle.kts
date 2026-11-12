@@ -56,7 +56,6 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
 
   // Pleos Connect SDK
-  implementation(libs.pleos.navihelper)
   implementation(libs.pleos.vehicle)
 
   // Local storage

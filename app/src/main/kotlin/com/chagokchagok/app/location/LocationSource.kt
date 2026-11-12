@@ -1,39 +1,33 @@
 package com.chagokchagok.app.location
 
-import kotlinx.coroutines.flow.StateFlow
+/**
+ * A single location reading. It lives in memory only long enough to look up the si/gun/gu
+ * and is never persisted or logged.
+ */
+data class LocationFix(val latitude: Double, val longitude: Double)
 
-/** A single location reading. Raw coordinates stay in memory only and are never persisted. */
-data class LocationFix(
-  val latitude: Double,
-  val longitude: Double,
-  /** Human-readable address when the source provides one (NaviHelper does). */
-  val address: String? = null,
-  val timestampMillis: Long = System.currentTimeMillis(),
-)
+/** Outcome of one [LocationSource.readOnce] call. */
+sealed interface LocationRead {
+  data class Fix(val fix: LocationFix) : LocationRead
 
-/** Connection / availability state of a [LocationSource]. */
-sealed interface SourceStatus {
-  data object Idle : SourceStatus
-  data object Connecting : SourceStatus
-  data object Ready : SourceStatus
-  data class Failed(val reason: String) : SourceStatus
+  /** The platform location permission is not granted. */
+  data object PermissionMissing : LocationRead
+
+  /** Location is off or no fix arrived in time. */
+  data object Unavailable : LocationRead
 }
 
 /**
  * The one interface the app reads location through.
- * NaviHelper on real cars, LocationManager on the emulator (built-in navigation ignores virtual GPS there).
+ * P0 uses [AndroidLocationSource] (LocationManager; follows `adb emu geo fix` on the emulator).
+ * [NaviHelperLocationSource] is the planned real-car source and is a stub for now.
+ *
+ * Callers must check the user's location consent before calling [readOnce]; when consent is
+ * declined the app never calls it.
  */
 interface LocationSource {
   val name: String
-  val status: StateFlow<SourceStatus>
-  val latest: StateFlow<LocationFix?>
 
-  /** Begin receiving updates. Call from onStart. */
-  fun start()
-
-  /** Ask the source for a fresh reading (no-op for push-based sources). */
-  fun refresh()
-
-  /** Stop updates. Call from onStop. */
-  fun stop()
+  /** Reads the current location once. No updates continue after it returns. */
+  suspend fun readOnce(): LocationRead
 }

@@ -16,10 +16,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Pleos NaviHelper: get*Info() -->
-    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <!-- Pleos NaviHelper (pleos.car.permission.NAVI_ROUTE) is not used in P0; see NaviHelperLocationSource. -->
 
-    <!-- AAOS CarPropertyManager: IGNITION_STATE -->
+    <!-- AAOS car properties (gear / ignition), for parked detection -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
 
     <!--

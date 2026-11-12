@@ -1,79 +1,78 @@
 package com.chagokchagok.app
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.chagokchagok.app.car.CarStateMonitor
-import com.chagokchagok.app.debug.SmokeTestScreen
-import com.chagokchagok.app.location.AndroidLocationSource
-import com.chagokchagok.app.location.NaviHelperLocationSource
+import com.chagokchagok.app.ui.AppViewModel
+import com.chagokchagok.app.ui.Screen
+import com.chagokchagok.app.ui.consent.ConsentScreen
+import com.chagokchagok.app.ui.home.HomeScreen
 import com.chagokchagok.app.ui.theme.ChagokChagokTheme
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-  private lateinit var androidLocation: AndroidLocationSource
-  private lateinit var naviLocation: NaviHelperLocationSource
+  private val vm: AppViewModel by viewModels()
   private lateinit var carState: CarStateMonitor
 
+  /** Set when the system no longer shows the permission dialog, so the next tap opens settings instead. */
+  private var permissionBlocked = false
+
+  // The permission dialog pauses this activity; onResume runs the check-in after it closes.
   private val permissionRequest =
-    registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-      // Re-run start so the LocationManager source picks up the new grant.
-      androidLocation.stop()
-      androidLocation.start()
+    registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      permissionBlocked = !granted && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    androidLocation = AndroidLocationSource(this)
-    naviLocation = NaviHelperLocationSource(this)
     carState = CarStateMonitor(this)
+    applyDebugDayOffset(intent)
 
-    permissionRequest.launch(
-      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-    )
-
-    // Poll only while visible; nothing runs in the background.
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
-        while (true) {
-          delay(REFRESH_INTERVAL_MS)
-          refreshAll()
+        carState.uxRestricted.collect { restricted ->
+          val parkedNow = vm.setDrivingRestricted(restricted)
+          if (parkedNow && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            vm.checkIn(hasLocationPermission())
+          }
         }
       }
     }
 
     setContent {
       ChagokChagokTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-          val uxRestricted by carState.uxRestricted.collectAsStateWithLifecycle()
-          if (uxRestricted) {
-            // Parked-only app: hide everything while driving restrictions are active.
-            Box(contentAlignment = Alignment.Center) {
-              Text("주차 후 이용해 주세요", style = MaterialTheme.typography.headlineMedium)
-            }
-          } else {
-            val androidStatus by androidLocation.status.collectAsStateWithLifecycle()
-            val androidFix by androidLocation.latest.collectAsStateWithLifecycle()
-            val naviStatus by naviLocation.status.collectAsStateWithLifecycle()
-            val naviFix by naviLocation.latest.collectAsStateWithLifecycle()
-            val ignition by carState.ignition.collectAsStateWithLifecycle()
-            SmokeTestScreen(androidStatus, androidFix, naviStatus, naviFix, ignition, onRefresh = ::refreshAll)
-          }
+        val screen by vm.screen.collectAsStateWithLifecycle()
+        val consent by vm.consent.collectAsStateWithLifecycle()
+        val book by vm.book.collectAsStateWithLifecycle()
+        val checkIn by vm.checkIn.collectAsStateWithLifecycle()
+
+        BackHandler(enabled = screen != Screen.TODAY) { vm.back() }
+        when (screen) {
+          Screen.CONSENT -> ConsentScreen(onAccept = ::acceptConsent, onLater = vm::declineConsent)
+          Screen.TODAY -> HomeScreen(
+            book = book,
+            consent = consent,
+            checkIn = checkIn,
+            onTurnOnLocation = vm::openConsent,
+            onRetry = { vm.checkIn(hasLocationPermission()) },
+            onRequestPermission = ::requestLocationPermission,
+          )
         }
       }
     }
@@ -82,24 +81,51 @@ class MainActivity : ComponentActivity() {
   override fun onStart() {
     super.onStart()
     carState.start()
-    androidLocation.start()
-    naviLocation.start()
+  }
+
+  override fun onResume() {
+    super.onResume()
+    vm.checkIn(hasLocationPermission())
   }
 
   override fun onStop() {
-    naviLocation.stop()
-    androidLocation.stop()
     carState.stop()
     super.onStop()
   }
 
-  private fun refreshAll() {
-    androidLocation.refresh()
-    naviLocation.refresh()
-    carState.refresh()
+  private fun acceptConsent() {
+    vm.acceptConsent()
+    if (hasLocationPermission()) vm.checkIn(true) else requestLocationPermission()
+  }
+
+  private fun requestLocationPermission() {
+    if (!permissionBlocked) {
+      permissionRequest.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+      return
+    }
+    runCatching {
+      startActivity(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+      )
+    }
+  }
+
+  private fun hasLocationPermission() =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+      PackageManager.PERMISSION_GRANTED
+
+  /**
+   * Debug builds only: `am start -S -n com.chagokchagok.app/.MainActivity --el debug_day_offset 1`
+   * pretends today is one day later, to test WELCOME BACK on the emulator (the user build cannot set the clock).
+   */
+  private fun applyDebugDayOffset(intent: Intent?) {
+    val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    if (debuggable && intent?.hasExtra(EXTRA_DAY_OFFSET) == true) {
+      vm.dayOffset = intent.getLongExtra(EXTRA_DAY_OFFSET, 0)
+    }
   }
 
   private companion object {
-    const val REFRESH_INTERVAL_MS = 3_000L
+    const val EXTRA_DAY_OFFSET = "debug_day_offset"
   }
 }
