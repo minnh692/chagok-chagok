@@ -10,6 +10,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import com.chagokchagok.app.ui.mymap.MyMapScreen
+import com.chagokchagok.app.ui.next.NextStampScreen
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -74,6 +75,9 @@ class MainActivity : ComponentActivity() {
         val geometry = rememberMapGeometry(regions)
         val collections by vm.collections.collectAsStateWithLifecycle()
         val completions by vm.completions.collectAsStateWithLifecycle()
+        val recommendations by vm.recommendations.collectAsStateWithLifecycle()
+        val confirming by vm.confirming.collectAsStateWithLifecycle()
+        val handoff by vm.handoff.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.
@@ -98,7 +102,7 @@ class MainActivity : ComponentActivity() {
             onTurnOnLocation = vm::openConsent,
             onRetry = { vm.checkIn(hasLocationPermission()) },
             onRequestPermission = ::requestLocationPermission,
-            onOpenNavi = ::openNavigation,
+            onOpenNavi = { vm.dismissNaviPrompt(); vm.openNext() },
             onDismissNavi = vm::dismissNaviPrompt,
             onSaveMemo = vm::saveMemo,
             collections = collections,
@@ -113,6 +117,17 @@ class MainActivity : ComponentActivity() {
             filter = filter,
             collections = collections,
             onFilter = vm::setFilter,
+            onBack = { vm.back() },
+            onOpenNext = vm::openNext,
+          )
+          Screen.NEXT -> NextStampScreen(
+            geometry = geometry,
+            book = book,
+            recommendations = recommendations,
+            confirming = confirming,
+            handoff = handoff,
+            onConfirm = vm::confirmNext,
+            onStart = { code -> vm.startRoute(code, ::openNavigationApp) },
             onBack = { vm.back() },
           )
         }
@@ -157,9 +172,8 @@ class MainActivity : ComponentActivity() {
   private fun navigationIntent(): Intent =
     Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MAPS)
 
-  private fun openNavigation() {
-    vm.dismissNaviPrompt()
-    // Its own task, so the navigation does not stack on top of ours (reopening Chagok Chagok must show us).
+  // Its own task, so the navigation does not stack on top of ours (reopening Chagok Chagok must show us).
+  private fun openNavigationApp() {
     runCatching { startActivity(navigationIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
   }
 

@@ -37,6 +37,7 @@ import com.chagokchagok.app.data.StampBook
 import com.chagokchagok.app.region.RegionFinder
 import com.chagokchagok.app.region.RegionIndex
 import com.chagokchagok.app.ui.components.GhostButton
+import com.chagokchagok.app.ui.components.StampButton
 import com.chagokchagok.app.ui.components.MapLegend
 import com.chagokchagok.app.ui.map.MapFilter
 import com.chagokchagok.app.ui.map.MapGeometry
@@ -65,6 +66,7 @@ fun MyMapScreen(
   collections: Collections?,
   onFilter: (MapFilter) -> Unit,
   onBack: () -> Unit,
+  onOpenNext: () -> Unit,
 ) {
   var selectedCode by rememberSaveable { mutableStateOf<String?>(null) }
   val selected = selectedCode?.let { regions?.get(it) }
@@ -117,6 +119,8 @@ fun MyMapScreen(
       Text("선택한 지역", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
       Spacer(Modifier.height(12.dp))
       if (detail == null) SelectHint() else RegionDetailCard(detail)
+      Spacer(Modifier.height(16.dp))
+      StampButton("다음 도장 추천", onOpenNext, Modifier.fillMaxWidth())
       Spacer(Modifier.height(28.dp))
       CollectionList("시·도별 컬렉션", progress.filter { it.kind == CollectionProgress.Kind.SIDO })
       Spacer(Modifier.height(28.dp))

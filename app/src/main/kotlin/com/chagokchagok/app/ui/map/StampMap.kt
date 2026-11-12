@@ -54,6 +54,7 @@ data class MapPin(val code: String, val title: String, val tag: String, val sub:
  * @param topInset / bottomInset space kept free for the header and the tabs.
  * @param veil drawn over everything (used while driving), or null.
  * @param selected region drawn with a dark outline, or null.
+ * @param connectPins false draws the pins without the dotted line between them.
  * @param onTap when set, the map can be pinched, double-tapped and dragged, and a tap reports the
  *   (longitude, latitude) under the finger. Null keeps the map static and ignores touches.
  */
@@ -68,6 +69,7 @@ fun StampMap(
   veil: Color? = null,
   selected: String? = null,
   onTap: ((lon: Double, lat: Double) -> Unit)? = null,
+  connectPins: Boolean = true,
 ) {
   BoxWithConstraints(modifier.clipToBounds()) {
     val density = LocalDensity.current
@@ -124,7 +126,7 @@ fun StampMap(
           drawPath(path, Palette.Selected, style = Stroke(width = 4.dp.toPx() / f.scale, join = StrokeJoin.Round))
         }
       }
-      if (veil == null) drawRoute(points)
+      if (veil == null) drawRoute(points, connectPins)
       if (veil != null) drawRect(veil)
     }
 
@@ -157,8 +159,8 @@ private fun fit(geo: MapGeometry, width: Float, height: Float, pad: Float, topIn
  * Today's route in screen pixels so the dots do not scale with the map: gently curved dotted segments
  * (always bending to the same side) and ring pins, the latest one larger.
  */
-private fun DrawScope.drawRoute(points: List<Offset>) {
-  if (points.size >= 2) {
+private fun DrawScope.drawRoute(points: List<Offset>, connect: Boolean) {
+  if (connect && points.size >= 2) {
     val path = Path()
     path.moveTo(points[0].x, points[0].y)
     for (i in 1 until points.size) {

@@ -76,6 +76,11 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
   `PUT /vehicle/gear?gear=Drive|Park`, `PUT /vehicle/controls?speed=30&accelerator=20&brake=0`, and keep sending
   `POST /browser/session?client=<any>` about once a second (without it changes may not apply).
   D + 30 km/h -> CarUxRestrictions active; P + 0 km/h (+ brake) -> cleared.
+- NaviHelper `requestRoute(RouteInfo)` (permission `NAVI_ROUTE_SEARCH`) works: the navigation opens its route search
+  to the coordinate (from its own fixed position) and auto-starts guidance after a countdown. But our process receives
+  NO listener events at all (no onRoutingCompleted/onRouteStarted, and no answers to getDestinationInfo /
+  getRouteStateInfo) even with `NAVI_ROUTE` granted, so the app's 5 s timeout always fires on the emulator.
+  Both `pleos.car.permission.NAVI_ROUTE*` permissions are granted at install.
 - The car navigation app answers the standard `ACTION_MAIN` + `CATEGORY_APP_MAPS` intent
   (`Intent.makeMainSelectorActivity`). Start it with `FLAG_ACTIVITY_NEW_TASK`, otherwise it stacks inside our task.
   It opens in the main (center) window; our app goes behind the right-edge handle.
@@ -87,9 +92,9 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - minSdk 28, targetSdk 34 (Pleos image), compileSdk 36 (required by current AndroidX).
 - `useLibrary("android.car")` for CarUxRestrictionsManager / CarPropertyManager.
 - Pleos Maven repo: `https://nexus-playground.pleos.ai/repository/maven-releases/`
-  (`ai.pleos.playground:Vehicle:2.3.2` is used; `NaviHelper:3.0.5` is in the version catalog but not a dependency yet).
-- Permissions: location, `android.car.permission.CAR_POWERTRAIN`. `pleos.car.permission.NAVI_ROUTE` is needed once
-  NaviHelper get*Info is used (see `location/NaviHelperLocationSource.kt`).
+  (`ai.pleos.playground:Vehicle:2.3.2` and `NaviHelper:3.0.5` are used; NaviHelper only behind `navi/RouteRequester`).
+- Permissions: location, `android.car.permission.CAR_POWERTRAIN`, `pleos.car.permission.NAVI_ROUTE_SEARCH` (requestRoute)
+  and `pleos.car.permission.NAVI_ROUTE` (get*Info, route events).
   Vehicle SDK adds `VEHICLE_BINDING` via its AAR. Each Vehicle domain needs its own `pleos.car.permission.CAR_*`.
 - NaviHelper / Vehicle API reference pages render with JavaScript. Verify signatures with `javap` on the AAR in
   `%USERPROFILE%\.gradle\caches\modules-2\files-2.1\ai.pleos.playground\` instead of guessing.

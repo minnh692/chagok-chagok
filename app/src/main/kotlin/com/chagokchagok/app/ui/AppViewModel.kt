@@ -6,6 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.chagokchagok.app.collection.CoastalRegions
 import com.chagokchagok.app.collection.CollectionProgress
 import com.chagokchagok.app.collection.Collections
+import com.chagokchagok.app.collection.NextStamp
+import com.chagokchagok.app.collection.NextStamps
+import com.chagokchagok.app.navi.NaviHelperRouteRequester
+import com.chagokchagok.app.navi.RouteRequester
+import com.chagokchagok.app.navi.RouteResult
+import com.chagokchagok.app.navi.RouteTarget
 import com.chagokchagok.app.consent.ConsentStore
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.data.AppDatabase
@@ -32,11 +38,27 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Recommendations and the region they start from (null when nothing is stamped yet). */
+data class Recommendations(val from: Region?, val items: List<NextStamp>)
+
 /** A collection that was just completed: a set ([progress]) or a two-season region ([seasonRegion]). */
 data class Completion(val id: String, val progress: CollectionProgress?, val seasonRegion: Region?)
 
 /** Top-level screens. The today screen is home; every other screen goes back to it. */
-enum class Screen { CONSENT, TODAY, MY_MAP }
+enum class Screen { CONSENT, TODAY, MY_MAP, NEXT }
+
+/** Handing a recommended region to the car's navigation (C3). */
+sealed interface Handoff {
+  data object Idle : Handoff
+  data object Requesting : Handoff
+  /** The navigation took the destination. */
+  data object Started : Handoff
+  /**
+   * NaviHelper failed or did not answer in time; the navigation app was opened for manual entry.
+   * [maybeSent]: it timed out after the request went out, so the navigation may already show the destination.
+   */
+  data class Manual(val maybeSent: Boolean) : Handoff
+}
 
 /** What the last parked check-in found. Shown at the top of the today screen. */
 sealed interface CheckIn {
@@ -169,12 +191,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     naviDismissedOn.value = day
   }
 
+  // --- Next stamp (C2 / C3) ------------------------------------------------------------------------
+  private val routeRequester: RouteRequester = NaviHelperRouteRequester(app)
+
+  private val _nextStamps = MutableStateFlow<NextStamps?>(null)
+
+  /** Up to 3 nearest unstamped regions from today's check-in region, or from the latest stamp. */
+  val recommendations: StateFlow<Recommendations?> =
+    combine(book, _nextStamps, _checkIn) { book, next, checkIn ->
+      next ?: return@combine null
+      val from = (checkIn as? CheckIn.Done)?.region?.code ?: next.anchor(book) ?: return@combine Recommendations(null, emptyList())
+      Recommendations(_regions.value?.get(from), withContext(Dispatchers.Default) { next.recommend(from, book) })
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+  /** The recommended region whose confirm screen (C3) is open. */
+  private val _confirming = MutableStateFlow<String?>(null)
+  val confirming: StateFlow<String?> = _confirming
+
+  private val _handoff = MutableStateFlow<Handoff>(Handoff.Idle)
+  val handoff: StateFlow<Handoff> = _handoff
+
+  fun confirmNext(code: String?) {
+    if (_handoff.value == Handoff.Requesting) return
+    _confirming.value = code
+    _handoff.value = Handoff.Idle
+  }
+
+  /**
+   * "안내 시작": remembers the destination region (code only) and asks the navigation for a route to the
+   * region's label point. On error or after [RouteRequester.TIMEOUT_MS], [openNavigationApp] is called instead.
+   */
+  fun startRoute(code: String, openNavigationApp: () -> Unit) {
+    val region = _regions.value?.get(code) ?: return
+    if (_handoff.value == Handoff.Requesting || _drivingRestricted.value) return
+    prefs.edit().putString(KEY_NEXT_DESTINATION, code).apply()
+    _handoff.value = Handoff.Requesting
+    viewModelScope.launch {
+      val result = routeRequester.requestRoute(RouteTarget(region.name, region.fullName, region.labelLat, region.labelLon))
+      if (result == RouteResult.STARTED) {
+        _handoff.value = Handoff.Started
+      } else {
+        openNavigationApp()
+        _handoff.value = Handoff.Manual(maybeSent = result == RouteResult.TIMED_OUT)
+      }
+    }
+  }
+
+  /** The region chosen with "안내 시작", or null. Only the region code is stored. */
+  val nextDestination: String? get() = prefs.getString(KEY_NEXT_DESTINATION, null)
+
   init {
     // Parse and index the bundled boundaries once per process.
     viewModelScope.launch {
       val index = RegionAssets.load(app)
       _regions.value = index
-      _collections.value = withContext(Dispatchers.Default) { Collections(index, CoastalRegions.derive(index)) }
+      val collections = withContext(Dispatchers.Default) { Collections(index, CoastalRegions.derive(index)) }
+      _collections.value = collections
+      _nextStamps.value = withContext(Dispatchers.Default) { NextStamps(index, collections) }
     }
     watchCompletions()
   }
@@ -191,9 +264,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     _screen.value = Screen.MY_MAP
   }
 
+  /** Where back from the recommendation screen goes. */
+  private var nextReturnsTo = Screen.TODAY
+
+  fun openNext() {
+    if (_screen.value != Screen.NEXT) nextReturnsTo = _screen.value
+    _confirming.value = null
+    _handoff.value = Handoff.Idle
+    _screen.value = Screen.NEXT
+  }
+
   /** Back from any screen returns to the today screen. Returns false when already there. */
   fun back(): Boolean {
     if (_screen.value == Screen.TODAY) return false
+    if (_screen.value == Screen.NEXT) {
+      if (_confirming.value != null && _handoff.value != Handoff.Requesting) {
+        _confirming.value = null
+        _handoff.value = Handoff.Idle
+        return true
+      }
+      _screen.value = nextReturnsTo
+      return true
+    }
     if (_screen.value == Screen.CONSENT && consentStore.consent.value == LocationConsent.UNASKED) {
       consentStore.set(LocationConsent.DECLINED)
     }
@@ -278,5 +370,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   private companion object {
     const val PREFS = "settings"
     const val KEY_NAVI_DISMISSED = "navi_prompt_dismissed_on"
+    const val KEY_NEXT_DESTINATION = "next_destination_region"
   }
 }

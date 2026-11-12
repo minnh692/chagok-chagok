@@ -22,7 +22,7 @@ import com.chagokchagok.app.ui.theme.Palette
 /**
  * Nudge to start the car's navigation before driving off. Shown while parked, after the check-in has
  * finished, only when the app fills the screen (in a split the other window is usually the navigation).
- * "괜찮아요" hides it for the rest of the day.
+ * "추천 보기" opens the next-stamp recommendations; both buttons hide it for the rest of the day.
  */
 @Composable
 fun NaviPromptCard(onOpenNavi: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
@@ -37,14 +37,14 @@ fun NaviPromptCard(onOpenNavi: () -> Unit, onDismiss: () -> Unit, modifier: Modi
     Text("다음 도장은 내비로 찾아가요", style = MaterialTheme.typography.titleLarge, color = Palette.Text)
     Spacer(Modifier.height(6.dp))
     Text(
-      "출발 전에 목적지를 정해 두세요. 도착해서 주차한 뒤 차곡차곡을 열면 그곳에 도장을 찍어요.",
+      "가까운, 아직 도장이 없는 곳을 골라 내비로 안내받으세요. 도착해서 주차하면 그곳에 도장을 찍어요.",
       style = MaterialTheme.typography.bodyMedium,
       color = Palette.TextSecondary,
     )
     Spacer(Modifier.height(18.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       GhostButton("괜찮아요", onDismiss, Modifier.weight(1f))
-      StampButton("내비 켜기", onOpenNavi, Modifier.weight(1.4f))
+      StampButton("추천 보기", onOpenNavi, Modifier.weight(1.4f))
     }
   }
 }

@@ -75,6 +75,7 @@ dependencies {
 
   // Pleos Connect SDK
   implementation(libs.pleos.vehicle)
+  implementation(libs.pleos.navihelper)
 
   // Local storage
   implementation(libs.androidx.room.runtime)

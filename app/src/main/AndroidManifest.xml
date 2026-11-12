@@ -16,7 +16,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Pleos NaviHelper (pleos.car.permission.NAVI_ROUTE) is not used in P0; see NaviHelperLocationSource. -->
+    <!-- Pleos NaviHelper: requestRoute() needs NAVI_ROUTE_SEARCH; route events and getRecentDestinationInfo()
+         need NAVI_ROUTE (see navi/). -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
 
     <!-- Lets the app check that a navigation app exists before offering "내비 켜기" (package visibility). -->
     <queries>
