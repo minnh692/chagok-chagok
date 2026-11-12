@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.chagokchagok.app.consent.ConsentStore
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.data.AppDatabase
+import com.chagokchagok.app.data.CompanionType
 import com.chagokchagok.app.data.StampBook
 import com.chagokchagok.app.data.StampRepository
 import com.chagokchagok.app.data.StampResult
@@ -16,6 +17,7 @@ import com.chagokchagok.app.region.Region
 import com.chagokchagok.app.region.RegionAssets
 import com.chagokchagok.app.region.RegionFinder
 import com.chagokchagok.app.region.RegionIndex
+import com.chagokchagok.app.ui.map.MapFilter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,9 +72,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
   private val _today = MutableStateFlow(currentDay())
 
-  val book: StateFlow<StampBook> = combine(repository.observeStamps(), _today) { stamps, day ->
-    StampBook(stamps, day.toString())
-  }.stateIn(viewModelScope, SharingStarted.Eagerly, StampBook.empty(_today.value.toString()))
+  /**
+   * The companion just tapped, applied on top of stored stamps so the chip and the map change in the same
+   * frame as the tap instead of after the database round trip. Keyed by date; it matches what gets stored.
+   */
+  private val companionChoice = MutableStateFlow<Pair<String, CompanionType?>?>(null)
+
+  val book: StateFlow<StampBook> =
+    combine(repository.observeStamps(), _today, companionChoice) { stamps, day, choice ->
+      val today = day.toString()
+      val shown = if (choice == null || choice.first != today) {
+        stamps
+      } else {
+        stamps.map { if (it.date == today) it.copy(companion = choice.second?.key) else it }
+      }
+      StampBook(shown, today)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, StampBook.empty(_today.value.toString()))
+
+  private val _filter = MutableStateFlow(MapFilter.MINE)
+  val filter: StateFlow<MapFilter> = _filter
 
   private var checkInJob: Job? = null
 
@@ -110,6 +128,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     consentStore.set(LocationConsent.DECLINED)
     _checkIn.value = CheckIn.Idle
     _screen.value = Screen.TODAY
+  }
+
+  // --- Today ----------------------------------------------------------------------------------
+
+  /** Saves [companion] on today's stamps; null (tapping the chosen chip again) clears it. */
+  fun setTodayCompanion(companion: CompanionType?) {
+    val day = currentDay()
+    companionChoice.value = day.toString() to companion
+    viewModelScope.launch { repository.setCompanion(day, companion) }
+  }
+
+  fun setFilter(filter: MapFilter) {
+    _filter.value = filter
   }
 
   // --- Car state --------------------------------------------------------------------------------

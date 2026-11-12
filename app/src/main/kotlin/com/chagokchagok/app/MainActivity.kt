@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
         val book by vm.book.collectAsStateWithLifecycle()
         val checkIn by vm.checkIn.collectAsStateWithLifecycle()
         val regions by vm.regions.collectAsStateWithLifecycle()
+        val filter by vm.filter.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY) { vm.back() }
         when (screen) {
@@ -71,6 +72,9 @@ class MainActivity : ComponentActivity() {
             book = book,
             consent = consent,
             checkIn = checkIn,
+            filter = filter,
+            onFilter = vm::setFilter,
+            onCompanion = vm::setTodayCompanion,
             onTurnOnLocation = vm::openConsent,
             onRetry = { vm.checkIn(hasLocationPermission()) },
             onRequestPermission = ::requestLocationPermission,
