@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
         val handoff by vm.handoff.collectAsStateWithLifecycle()
         val arrival by vm.arrival.collectAsStateWithLifecycle()
         val restProgress by vm.restProgress.collectAsStateWithLifecycle()
+        val missed by vm.missed.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.
@@ -114,6 +115,9 @@ class MainActivity : ComponentActivity() {
             arrival = arrival,
             onArrivalDone = vm::arrivalShown,
             restProgress = restProgress,
+            missed = missed,
+            onStampMissed = vm::stampMissed,
+            onDismissMissed = vm::dismissMissed,
           )
           Screen.MY_MAP -> MyMapScreen(
             regions = regions,

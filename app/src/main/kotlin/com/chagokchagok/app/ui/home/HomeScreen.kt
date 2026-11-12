@@ -37,6 +37,8 @@ import com.chagokchagok.app.ui.theme.Eyebrow
 import com.chagokchagok.app.ui.today.NaviPromptCard
 import java.time.LocalDate
 import com.chagokchagok.app.collection.Collections
+import com.chagokchagok.app.navi.MissedStamp
+import com.chagokchagok.app.ui.today.MissedStampsCard
 import com.chagokchagok.app.collection.CollectionProgress
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.ui.Completion
@@ -87,6 +89,9 @@ fun HomeScreen(
   arrival: Arrival?,
   onArrivalDone: () -> Unit,
   restProgress: CollectionProgress?,
+  missed: List<MissedStamp>,
+  onStampMissed: (MissedStamp, LocalDate) -> Unit,
+  onDismissMissed: (MissedStamp) -> Unit,
 ) {
   val progress = remember(book, collections, restProgress) { collections?.progress(book).orEmpty() + listOfNotNull(restProgress) }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
@@ -147,6 +152,10 @@ fun HomeScreen(
         )
       } else {
         ConsentOffBanner(onTurnOn = onTurnOnLocation)
+      }
+      if (missed.isNotEmpty()) {
+        Spacer(Modifier.height(16.dp))
+        MissedStampsCard(missed, regions, today, onStampMissed, onDismissMissed)
       }
       completions.firstOrNull()?.let { c ->
         Spacer(Modifier.height(16.dp))

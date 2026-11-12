@@ -9,6 +9,10 @@ import com.chagokchagok.app.collection.Collections
 import com.chagokchagok.app.collection.NextStamp
 import com.chagokchagok.app.collection.NextStamps
 import com.chagokchagok.app.navi.NaviHelperRouteRequester
+import com.chagokchagok.app.navi.MissedStamp
+import com.chagokchagok.app.navi.MissedStampFinder
+import com.chagokchagok.app.navi.NaviHelperRecentDestinations
+import com.chagokchagok.app.navi.RecentDestinationSource
 import com.chagokchagok.app.data.RestVisitEntity
 import com.chagokchagok.app.restarea.RestArea
 import com.chagokchagok.app.restarea.RestAreaCatalog
@@ -273,6 +277,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     return CheckIn.RestStop(area, firstTime = before.isEmpty(), alreadyToday = alreadyToday, collected = collected, total = areas.size)
   }
 
+  // --- Navigation history fill-in (J-1) --------------------------------------------------------------
+  private val recentSource: RecentDestinationSource = NaviHelperRecentDestinations(app)
+  private var historyChecked = false
+
+  private val _missed = MutableStateFlow<List<MissedStamp>>(emptyList())
+
+  /** "빠진 도장": unstamped regions from the navigation history, until stamped or removed. Not stored. */
+  val missed: StateFlow<List<MissedStamp>> = _missed
+
+  /** Random per-install salt for the destination hashes; generated once and kept with the hashes. */
+  private fun salt(): ByteArray {
+    prefs.getString(KEY_NAVI_SALT, null)?.let { return android.util.Base64.decode(it, android.util.Base64.NO_WRAP) }
+    val bytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+    prefs.edit().putString(KEY_NAVI_SALT, android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)).apply()
+    return bytes
+  }
+
+  private fun markSeen(hashes: Set<String>) {
+    if (hashes.isEmpty()) return
+    val seen = prefs.getStringSet(KEY_NAVI_SEEN, emptySet()).orEmpty()
+    prefs.edit().putStringSet(KEY_NAVI_SEEN, seen + hashes).apply()
+  }
+
+  /** Once per app open, while parked and with consent: compares the navigation history with the stamps. */
+  private fun checkNaviHistory() {
+    if (historyChecked) return
+    historyChecked = true
+    viewModelScope.launch {
+      val history = recentSource.recentDestinations() ?: return@launch // unavailable or no answer in 5 s
+      val regions = RegionAssets.load(getApplication())
+      val finder = MissedStampFinder(salt()) { lat, lon -> RegionFinder(regions).find(lat, lon)?.code }
+      val seen = prefs.getStringSet(KEY_NAVI_SEEN, null)
+      val result = withContext(Dispatchers.Default) { finder.process(history, seen, book.value.stampedCodes) }
+      // The first run stores an empty set too, so later runs know the baseline was taken.
+      prefs.edit().putStringSet(KEY_NAVI_SEEN, seen.orEmpty() + result.markSeen).apply()
+      _missed.value = result.suggestions
+    }
+  }
+
+  fun stampMissed(item: MissedStamp, date: LocalDate) {
+    if (_drivingRestricted.value || date.isAfter(currentDay())) return
+    _missed.value = _missed.value - item
+    markSeen(item.hashes)
+    viewModelScope.launch { repository.stamp(item.regionCode, date) }
+  }
+
+  fun dismissMissed(item: MissedStamp) {
+    _missed.value = _missed.value - item
+    markSeen(item.hashes)
+  }
+
   init {
     viewModelScope.launch { _restAreas.value = RestAreaCatalog.load(app) }
     // Parse and index the bundled boundaries once per process.
@@ -394,6 +449,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     _today.value = currentDay()
     if (consentStore.consent.value != LocationConsent.GRANTED) return
     if (_drivingRestricted.value) return
+    checkNaviHistory()
     if (!hasPermission) {
       _checkIn.value = CheckIn.PermissionNeeded
       return
@@ -443,5 +499,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     const val KEY_NAVI_DISMISSED = "navi_prompt_dismissed_on"
     const val KEY_NEXT_DESTINATION = "next_destination_region"
     const val REST_ID = "rest"
+    const val KEY_NAVI_SALT = "navi_history_salt"
+    const val KEY_NAVI_SEEN = "navi_history_seen"
   }
 }

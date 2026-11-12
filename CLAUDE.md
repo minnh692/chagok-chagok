@@ -81,6 +81,8 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
   NO listener events at all (no onRoutingCompleted/onRouteStarted, and no answers to getDestinationInfo /
   getRouteStateInfo) even with `NAVI_ROUTE` granted, so the app's 5 s timeout always fires on the emulator.
   Both `pleos.car.permission.NAVI_ROUTE*` permissions are granted at install.
+  `getRecentDestinationInfo()` likewise gets no `onRecentDestinationInfo` answer, so the "빠진 도장" (J-1) flow is
+  covered only by unit tests with a fake `RecentDestinationSource`.
 - The car navigation app answers the standard `ACTION_MAIN` + `CATEGORY_APP_MAPS` intent
   (`Intent.makeMainSelectorActivity`). Start it with `FLAG_ACTIVITY_NEW_TASK`, otherwise it stacks inside our task.
   It opens in the main (center) window; our app goes behind the right-edge handle.
