@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -24,8 +26,24 @@ android {
   // Car APIs (CarUxRestrictionsManager, CarPropertyManager) are provided by the device at runtime.
   useLibrary("android.car")
 
+  // Release signing comes from outside the repo: ~/.chagok/keystore.properties (storeFile is relative to that
+  // folder). Without it the release build is left unsigned.
+  val signingProps = File(System.getProperty("user.home"), ".chagok/keystore.properties")
+  val releaseSigning = if (signingProps.isFile) {
+    val props = Properties().apply { signingProps.inputStream().use { load(it) } }
+    signingConfigs.create("release") {
+      storeFile = File(signingProps.parentFile, props.getProperty("storeFile"))
+      storePassword = props.getProperty("storePassword")
+      keyAlias = props.getProperty("keyAlias")
+      keyPassword = props.getProperty("keyPassword")
+    }
+  } else {
+    null
+  }
+
   buildTypes {
     release {
+      signingConfig = releaseSigning
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }

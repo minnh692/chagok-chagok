@@ -45,6 +45,17 @@ A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
 # Screenshot (debug-screens/ is git-ignored)
 "$A" shell screencap -p /sdcard/s.png && "$A" pull /sdcard/s.png debug-screens/
 
+# Release build (signed when ~/.chagok/keystore.properties exists; keystore lives there, outside the repo)
+./gradlew assembleRelease --console=plain
+cp app/build/outputs/apk/release/app-release.apk apk/Nautilus_ChagokChagok_release.apk
+# Debug and release are signed differently: `adb uninstall com.chagokchagok.app` before switching.
+
+# App files live in Android user 10: pm clear --user 10 / run-as com.chagokchagok.app --user 10 ...
+"$A" shell pm clear --user 10 com.chagokchagok.app
+
+# Pretend tomorrow (debug builds only), to test WELCOME BACK
+"$A" shell am start -S -n com.chagokchagok.app/.MainActivity --el debug_day_offset 1
+
 # Move virtual GPS (longitude latitude)
 "$A" emu geo fix 126.9707 37.5547   # Seoul
 "$A" emu geo fix 129.2247 35.8562   # Gyeongju
@@ -61,6 +72,14 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - `CarPropertyManager` IGNITION_STATE: not available (no property config) -> "unsupported".
   Vehicle SDK has an `IgnitionState` constant but no public getter. Use `Vehicle.getGear()` for parked detection instead.
 - The image is a user build: `cmd car_service get-property-value` is blocked.
+- Driving state can be injected with the Pleos Virtual Console: `adb forward tcp:8088 tcp:8088`, then
+  `PUT /vehicle/gear?gear=Drive|Park`, `PUT /vehicle/controls?speed=30&accelerator=20&brake=0`, and keep sending
+  `POST /browser/session?client=<any>` about once a second (without it changes may not apply).
+  D + 30 km/h -> CarUxRestrictions active; P + 0 km/h (+ brake) -> cleared.
+- The car navigation app answers the standard `ACTION_MAIN` + `CATEGORY_APP_MAPS` intent
+  (`Intent.makeMainSelectorActivity`). Start it with `FLAG_ACTIVITY_NEW_TASK`, otherwise it stacks inside our task.
+  It opens in the main (center) window; our app goes behind the right-edge handle.
+- Main app window is 1682x1210 px full width, 841 px wide in a split.
 
 ## Build setup
 
@@ -68,8 +87,9 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - minSdk 28, targetSdk 34 (Pleos image), compileSdk 36 (required by current AndroidX).
 - `useLibrary("android.car")` for CarUxRestrictionsManager / CarPropertyManager.
 - Pleos Maven repo: `https://nexus-playground.pleos.ai/repository/maven-releases/`
-  (`ai.pleos.playground:NaviHelper:3.0.5`, `ai.pleos.playground:Vehicle:2.3.2`).
-- Permissions: `pleos.car.permission.NAVI_ROUTE` (NaviHelper get*Info), location, `android.car.permission.CAR_POWERTRAIN`.
+  (`ai.pleos.playground:Vehicle:2.3.2` is used; `NaviHelper:3.0.5` is in the version catalog but not a dependency yet).
+- Permissions: location, `android.car.permission.CAR_POWERTRAIN`. `pleos.car.permission.NAVI_ROUTE` is needed once
+  NaviHelper get*Info is used (see `location/NaviHelperLocationSource.kt`).
   Vehicle SDK adds `VEHICLE_BINDING` via its AAR. Each Vehicle domain needs its own `pleos.car.permission.CAR_*`.
 - NaviHelper / Vehicle API reference pages render with JavaScript. Verify signatures with `javap` on the AAR in
   `%USERPROFILE%\.gradle\caches\modules-2\files-2.1\ai.pleos.playground\` instead of guessing.
@@ -85,7 +105,8 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - No external map SDKs or API keys. Region boundaries are drawn from bundled data.
 - Stay under ~400 MB memory. No always-on background work; work only while the activity is started.
 - Keep credentials (CRN, keys, tokens, keystores) out of git; `.gitignore` already covers the usual file names.
-- `app/src/main/kotlin/com/chagokchagok/app/debug/` is a temporary smoke-test screen, not the real UI.
+- UI style follows the Figma wireframe v4 loosely (dark panels, stamp-red accents); shared controls are in
+  `ui/components/Controls.kt`, colors in `ui/theme/Color.kt`.
 
 ## Docs (official sources beat memory)
 
