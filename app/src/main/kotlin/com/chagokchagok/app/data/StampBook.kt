@@ -4,7 +4,7 @@ package com.chagokchagok.app.data
  * Read-only view over all stored stamps for one "today". Everything the UI shows (totals, map fill,
  * today's list, companion filter) is derived here so it always agrees with what is stored.
  */
-class StampBook(stamps: List<StampEntity>, val today: String) {
+class StampBook(val stamps: List<StampEntity>, val today: String) {
   private val byRegion: Map<String, List<StampEntity>> = stamps.groupBy { it.regionCode }
   private val firstDateByRegion: Map<String, String> = byRegion.mapValues { (_, visits) -> visits.minOf { it.date } }
 
@@ -29,6 +29,12 @@ class StampBook(stamps: List<StampEntity>, val today: String) {
   fun visitCount(regionCode: String): Int = byRegion[regionCode]?.size ?: 0
 
   fun isNewToday(regionCode: String): Boolean = firstDateByRegion[regionCode] == today
+
+  /** The stored stamp with [id], or null. */
+  fun stamp(id: Long): StampEntity? = stamps.firstOrNull { it.id == id }
+
+  /** All visits to a region, oldest first. */
+  fun visits(regionCode: String): List<StampEntity> = byRegion[regionCode].orEmpty().sortedBy { it.date }
 
   /** Regions that have at least one stamp with [companion]. */
   fun codesWith(companion: CompanionType): Set<String> =

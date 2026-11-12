@@ -71,6 +71,7 @@ fun HomeScreen(
   onRequestPermission: () -> Unit,
   onOpenNavi: () -> Unit,
   onDismissNavi: () -> Unit,
+  onSaveMemo: (stampId: Long, memo: String) -> Unit,
 ) {
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
   val fills = remember(fillsByCode) { fillColors(fillsByCode) }
@@ -120,7 +121,10 @@ fun HomeScreen(
   val panel = @Composable { modifier: Modifier, wide: Boolean ->
     Column(modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
       if (consent == LocationConsent.GRANTED) {
-        CheckInCard(checkIn, onRetry = onRetry, onRequestPermission = onRequestPermission)
+        CheckInCard(
+          checkIn, book, regions,
+          onRetry = onRetry, onRequestPermission = onRequestPermission, onSaveMemo = onSaveMemo,
+        )
       } else {
         ConsentOffBanner(onTurnOn = onTurnOnLocation)
       }

@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
             onRequestPermission = ::requestLocationPermission,
             onOpenNavi = ::openNavigation,
             onDismissNavi = vm::dismissNaviPrompt,
+            onSaveMemo = vm::saveMemo,
           )
         }
       }

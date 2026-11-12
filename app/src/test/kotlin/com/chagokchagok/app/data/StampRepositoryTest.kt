@@ -144,4 +144,14 @@ class StampRepositoryTest {
     assertEquals(setOf("stamps"), tables)
     assertEquals(setOf("id", "region_code", "date", "day_order", "companion", "memo"), columns)
   }
+
+  @Test fun memoIsTrimmedCappedAndClearable() = runBlocking {
+    val stamp = repo.stamp(seongnam, day1).stamp
+    repo.setMemo(stamp.id, "  두물머리   산책  ")
+    assertEquals("두물머리 산책", dao.rows.value.single().memo)
+    repo.setMemo(stamp.id, "가".repeat(60))
+    assertEquals(StampRepository.MEMO_MAX, dao.rows.value.single().memo!!.length)
+    repo.setMemo(stamp.id, "   ")
+    assertNull(dao.rows.value.single().memo)
+  }
 }

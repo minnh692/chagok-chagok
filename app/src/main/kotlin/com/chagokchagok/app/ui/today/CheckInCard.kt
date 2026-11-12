@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chagokchagok.app.data.StampBook
 import com.chagokchagok.app.data.StampResult
+import com.chagokchagok.app.region.RegionIndex
 import com.chagokchagok.app.ui.CheckIn
 import com.chagokchagok.app.ui.components.StampButton
 import com.chagokchagok.app.ui.theme.Eyebrow
@@ -35,8 +37,11 @@ fun ConsentOffBanner(onTurnOn: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 fun CheckInCard(
   checkIn: CheckIn,
+  book: StampBook,
+  regions: RegionIndex?,
   onRetry: () -> Unit,
   onRequestPermission: () -> Unit,
+  onSaveMemo: (stampId: Long, memo: String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   when (checkIn) {
@@ -54,7 +59,25 @@ fun CheckInCard(
       modifier, "위치 권한이 필요해요", "도장을 찍으려면 차량 설정에서 위치 권한을 허용해 주세요.",
       action = "권한 허용" to onRequestPermission,
     )
-    is CheckIn.Done -> ResultCard(checkIn, modifier)
+    is CheckIn.Done -> {
+      val result = checkIn.result
+      // First stamp ever in this region: the B3 card with the memo field. Revisits keep the plain result card.
+      if (result is StampResult.New) {
+        val region = checkIn.region
+        val sidoTotal = regions?.regions?.count { it.sido == region.sido }
+        val sidoDone = book.stampedCodes.count { regions?.get(it)?.sido == region.sido }
+        FirstVisitCard(
+          stamp = book.stamp(result.stamp.id) ?: result.stamp,
+          region = region,
+          total = result.total,
+          extraStat = sidoTotal?.let { region.sido to "$sidoDone / $it" },
+          onSaveMemo = { onSaveMemo(result.stamp.id, it) },
+          modifier = modifier,
+        )
+      } else {
+        ResultCard(checkIn, modifier)
+      }
+    }
   }
 }
 

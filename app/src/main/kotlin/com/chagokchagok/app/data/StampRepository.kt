@@ -59,7 +59,16 @@ class StampRepository(private val dao: StampDao) {
     dao.setCompanionOn(date.toString(), companion?.key)
   }
 
+  /** Saves a one-line memo (trimmed, at most [MEMO_MAX] characters); blank clears it. */
   suspend fun setMemo(stampId: Long, memo: String?) = writeLock.withLock {
-    dao.setMemo(stampId, memo?.trim()?.takeIf { it.isNotEmpty() })
+    dao.setMemo(stampId, cleanMemo(memo))
+  }
+
+  companion object {
+    const val MEMO_MAX = 40
+    private val WHITESPACE = Regex("""\s+""")
+
+    fun cleanMemo(memo: String?): String? =
+      memo?.replace(WHITESPACE, " ")?.trim()?.take(MEMO_MAX)?.trim()?.takeIf { it.isNotEmpty() }
   }
 }

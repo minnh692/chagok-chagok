@@ -165,6 +165,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     viewModelScope.launch { repository.setCompanion(day, companion) }
   }
 
+  fun saveMemo(stampId: Long, memo: String) {
+    viewModelScope.launch { repository.setMemo(stampId, memo) }
+  }
+
   fun setFilter(filter: MapFilter) {
     _filter.value = filter
   }
