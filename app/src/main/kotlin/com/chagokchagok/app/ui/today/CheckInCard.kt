@@ -59,6 +59,7 @@ fun CheckInCard(
       modifier, "위치 권한이 필요해요", "도장을 찍으려면 차량 설정에서 위치 권한을 허용해 주세요.",
       action = "권한 허용" to onRequestPermission,
     )
+    is CheckIn.RestStop -> RestStopCard(checkIn, modifier)
     is CheckIn.Done -> {
       val result = checkIn.result
       // First stamp ever in this region: the B3 card with the memo field. Revisits keep the plain result card.
@@ -100,6 +101,39 @@ private fun ResultCard(done: CheckIn.Done, modifier: Modifier) {
     Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
     Spacer(Modifier.height(8.dp))
     Text(line, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal), color = Palette.TextSecondary)
+  }
+}
+
+/** "+1 COLLECTED": a rest area was collected (the si/gun/gu is not stamped there). */
+@Composable
+private fun RestStopCard(stop: CheckIn.RestStop, modifier: Modifier) {
+  val (badge, color) = when {
+    stop.alreadyToday -> "ALREADY COLLECTED" to Palette.TextSecondary
+    stop.firstTime -> "+1 COLLECTED" to Palette.StampedToday
+    else -> "AGAIN" to Palette.StampedBefore
+  }
+  val line = when {
+    stop.alreadyToday -> "${stop.area.name} 휴게소 · 오늘 이미 모았어요"
+    stop.firstTime -> "${stop.area.name} 휴게소를 모았어요"
+    else -> "${stop.area.name} 휴게소 · 다시 들렀어요"
+  }
+  Column(
+    modifier = modifier
+      .fillMaxWidth()
+      .background(Palette.Card, RoundedCornerShape(20.dp))
+      .padding(horizontal = 28.dp, vertical = 24.dp),
+  ) {
+    Text("REST AREA  ·  ${stop.area.routeName}", style = Eyebrow, color = Palette.Primary)
+    Spacer(Modifier.height(4.dp))
+    Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+    Spacer(Modifier.height(8.dp))
+    Text(line, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal), color = Palette.Text)
+    Spacer(Modifier.height(4.dp))
+    Text(
+      "고속도로 휴게소 ${stop.collected}/${stop.total} · 휴게소에서는 시·군·구 도장을 찍지 않아요",
+      style = MaterialTheme.typography.bodyMedium,
+      color = Palette.TextSecondary,
+    )
   }
 }
 

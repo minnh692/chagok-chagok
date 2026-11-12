@@ -16,7 +16,7 @@ data class CollectionProgress(
   /** Region codes that count toward this collection (the whole set, stamped or not). Empty for season. */
   val members: Set<String> = emptySet(),
 ) {
-  enum class Kind { SIDO, COAST, SEASON, COMPANION }
+  enum class Kind { SIDO, COAST, SEASON, COMPANION, REST }
 
   val complete: Boolean get() = target > 0 && done >= target
   val fraction: Float get() = if (target == 0) 0f else (done.toFloat() / target).coerceAtMost(1f)

@@ -37,6 +37,7 @@ import com.chagokchagok.app.ui.theme.Eyebrow
 import com.chagokchagok.app.ui.today.NaviPromptCard
 import java.time.LocalDate
 import com.chagokchagok.app.collection.Collections
+import com.chagokchagok.app.collection.CollectionProgress
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.ui.Completion
 import com.chagokchagok.app.ui.today.CollectionChips
@@ -85,8 +86,9 @@ fun HomeScreen(
   onOpenMyMap: () -> Unit,
   arrival: Arrival?,
   onArrivalDone: () -> Unit,
+  restProgress: CollectionProgress?,
 ) {
-  val progress = remember(book, collections) { collections?.progress(book).orEmpty() }
+  val progress = remember(book, collections, restProgress) { collections?.progress(book).orEmpty() + listOfNotNull(restProgress) }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
   val fills = remember(fillsByCode) { fillColors(fillsByCode) }
   // Today's route belongs to "my map"; companion tabs only show which regions were shared.

@@ -67,13 +67,14 @@ fun MyMapScreen(
   onFilter: (MapFilter) -> Unit,
   onBack: () -> Unit,
   onOpenNext: () -> Unit,
+  restProgress: CollectionProgress?,
 ) {
   var selectedCode by rememberSaveable { mutableStateOf<String?>(null) }
   val selected = selectedCode?.let { regions?.get(it) }
   val detail = remember(selected, book) { selected?.let { RegionDetail.of(it, book) } }
   val finder = remember(regions) { regions?.let(::RegionFinder) }
   val fills = remember(book, filter) { fillColors(mapFills(book, filter)) }
-  val progress = remember(book, collections) { collections?.progress(book).orEmpty() }
+  val progress = remember(book, collections, restProgress) { collections?.progress(book).orEmpty() + listOfNotNull(restProgress) }
   val pins = remember(detail) { listOfNotNull(detail?.let(::calloutPin)) }
   val regionCount = regions?.size ?: 230
 

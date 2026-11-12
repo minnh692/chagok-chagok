@@ -141,8 +141,9 @@ class StampRepositoryTest {
     val text = latest.readText()
     val tables = Regex("\"tableName\":\\s*\"([^\"]+)\"").findAll(text).map { it.groupValues[1] }.toSet()
     val columns = Regex("\"columnName\":\\s*\"([^\"]+)\"").findAll(text).map { it.groupValues[1] }.toSet()
-    assertEquals(setOf("stamps"), tables)
-    assertEquals(setOf("id", "region_code", "date", "day_order", "companion", "memo"), columns)
+    assertEquals(setOf("stamps", "rest_visits"), tables)
+    // rest_visits adds only rest_area_id (its id and date columns share names with stamps).
+    assertEquals(setOf("id", "region_code", "date", "day_order", "companion", "memo", "rest_area_id"), columns)
   }
 
   @Test fun memoIsTrimmedCappedAndClearable() = runBlocking {

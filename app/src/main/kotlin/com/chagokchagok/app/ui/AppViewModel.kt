@@ -9,6 +9,10 @@ import com.chagokchagok.app.collection.Collections
 import com.chagokchagok.app.collection.NextStamp
 import com.chagokchagok.app.collection.NextStamps
 import com.chagokchagok.app.navi.NaviHelperRouteRequester
+import com.chagokchagok.app.data.RestVisitEntity
+import com.chagokchagok.app.restarea.RestArea
+import com.chagokchagok.app.restarea.RestAreaCatalog
+import com.chagokchagok.app.restarea.RestAreaFinder
 import com.chagokchagok.app.navi.RouteRequester
 import com.chagokchagok.app.navi.RouteResult
 import com.chagokchagok.app.navi.RouteTarget
@@ -66,6 +70,12 @@ sealed interface CheckIn {
   data object Idle : CheckIn
   data object Locating : CheckIn
   data class Done(val result: StampResult, val region: Region) : CheckIn
+
+  /**
+   * Parked within 300 m of an expressway rest area: the rest area is collected instead of stamping the region.
+   * [firstTime]: never collected before; [alreadyToday]: already collected today (nothing new stored).
+   */
+  data class RestStop(val area: RestArea, val firstTime: Boolean, val alreadyToday: Boolean, val collected: Int, val total: Int) : CheckIn
   data object OutsideRegions : CheckIn
   data object LocationUnavailable : CheckIn
   data object PermissionNeeded : CheckIn
@@ -74,6 +84,7 @@ sealed interface CheckIn {
 class AppViewModel(app: Application) : AndroidViewModel(app) {
   private val consentStore = ConsentStore(app)
   private val repository = StampRepository(AppDatabase.get(app).stampDao())
+  private val restVisits = AppDatabase.get(app).restVisitDao()
   // The single place that decides where location comes from (see LocationSource).
   private val locationSource: LocationSource = AndroidLocationSource(app)
 
@@ -241,7 +252,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   /** The region chosen with "안내 시작", or null. Only the region code is stored. */
   val nextDestination: String? get() = prefs.getString(KEY_NEXT_DESTINATION, null)
 
+  // --- Rest areas ---------------------------------------------------------------------------------
+  private val _restAreas = MutableStateFlow<List<RestArea>?>(null)
+
+  /** "고속도로 휴게소" progress: distinct rest areas collected (both directions count as one). */
+  val restProgress: StateFlow<CollectionProgress?> =
+    combine(restVisits.observeAll(), _restAreas) { visits, areas ->
+      areas ?: return@combine null
+      val done = visits.mapTo(HashSet()) { it.restAreaId }.count { id -> areas.any { it.id == id } }
+      CollectionProgress(REST_ID, CollectionProgress.Kind.REST, "고속도로 휴게소", done, areas.size)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+  /** Stores today's visit to [area] (id + date only) and reports it. */
+  private suspend fun collectRestArea(area: RestArea, areas: List<RestArea>): CheckIn.RestStop {
+    val day = currentDay().toString()
+    val before = restVisits.visitsTo(area.id)
+    val alreadyToday = before.any { it.date == day }
+    if (!alreadyToday) restVisits.insert(RestVisitEntity(restAreaId = area.id, date = day))
+    val collected = restProgress.value?.done?.plus(if (before.isEmpty()) 1 else 0) ?: 1
+    return CheckIn.RestStop(area, firstTime = before.isEmpty(), alreadyToday = alreadyToday, collected = collected, total = areas.size)
+  }
+
   init {
+    viewModelScope.launch { _restAreas.value = RestAreaCatalog.load(app) }
     // Parse and index the bundled boundaries once per process.
     viewModelScope.launch {
       val index = RegionAssets.load(app)
@@ -375,6 +408,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         LocationRead.PermissionMissing -> CheckIn.PermissionNeeded
         LocationRead.Unavailable -> CheckIn.LocationUnavailable
         is LocationRead.Fix -> {
+          // A rest area takes priority: it is collected and the region is not stamped (the car only passed through).
+          val areas = RestAreaCatalog.load(getApplication())
+          val restArea = withContext(Dispatchers.Default) { RestAreaFinder(areas).find(read.fix.latitude, read.fix.longitude) }
+          if (restArea != null) {
+            _checkIn.value = collectRestArea(restArea, areas)
+            return@launch
+          }
           val region = withContext(Dispatchers.Default) {
             RegionFinder(regions).find(read.fix.latitude, read.fix.longitude)
           }
@@ -402,5 +442,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     const val PREFS = "settings"
     const val KEY_NAVI_DISMISSED = "navi_prompt_dismissed_on"
     const val KEY_NEXT_DESTINATION = "next_destination_region"
+    const val REST_ID = "rest"
   }
 }
