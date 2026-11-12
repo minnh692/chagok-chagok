@@ -48,7 +48,7 @@ import kotlin.math.roundToInt
 
 /**
  * "다음 도장 추천" (C2) and its hand-off confirm (C3). The list shows the 3 nearest unstamped regions;
- * "내비로 안내" opens the confirm with what a stamp there would collect; "안내 시작" sends it to the navigation.
+ * "내비로 안내" sends the region to the navigation right away and shows what a stamp there would collect.
  */
 @Composable
 fun NextStampScreen(
@@ -103,7 +103,7 @@ fun NextStampScreen(
           Spacer(Modifier.height(16.dp))
           items.forEachIndexed { i, n ->
             if (i > 0) Spacer(Modifier.height(14.dp))
-            Candidate(i + 1, n, onGuide = { onConfirm(n.region.code) })
+            Candidate(i + 1, n, onGuide = { onStart(n.region.code) })
           }
         }
       }
@@ -185,7 +185,7 @@ private fun Tag(text: String, strong: Boolean) {
   )
 }
 
-/** C3: what a stamp there collects, then "안내 시작". After the hand-off, how it went. */
+/** C3: what a stamp there collects and how the hand-off went, with "다시 보내기". */
 @Composable
 private fun Confirm(n: NextStamp, total: Int, handoff: Handoff, onCancel: () -> Unit, onStart: () -> Unit, onDone: () -> Unit) {
   Column(Modifier.fillMaxWidth().background(Palette.Card, RoundedCornerShape(20.dp)).padding(24.dp)) {
@@ -205,7 +205,7 @@ private fun Confirm(n: NextStamp, total: Int, handoff: Handoff, onCancel: () -> 
     when (handoff) {
       Handoff.Idle -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         GhostButton("취소", onCancel, Modifier.weight(1f))
-        StampButton("안내 시작", onStart, Modifier.weight(1.4f))
+        StampButton("내비로 보내기", onStart, Modifier.weight(1.4f))
       }
       Handoff.Requesting -> GhostButton("내비에 목적지를 보내는 중…", {}, Modifier.fillMaxWidth())
       Handoff.Started -> {
@@ -213,13 +213,21 @@ private fun Confirm(n: NextStamp, total: Int, handoff: Handoff, onCancel: () -> 
         Spacer(Modifier.height(14.dp))
         StampButton("확인", onDone, Modifier.fillMaxWidth())
       }
-      is Handoff.Manual -> {
-        Result(
-          if (handoff.maybeSent) "내비 화면에 목적지가 없으면 직접 입력해 주세요" else "내비에서 목적지를 직접 입력해 주세요",
-          "목적지: ${n.region.sido} ${n.region.name}",
-        )
+      Handoff.Sent -> {
+        Result("내비에 ${n.region.name}${objectParticle(n.region.name)} 보냈어요", "내비 화면에서 경로를 확인하세요. 도착해서 주차하면 도장을 찍어요.")
         Spacer(Modifier.height(14.dp))
-        StampButton("확인", onDone, Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+          GhostButton("다시 보내기", onStart, Modifier.weight(1f))
+          StampButton("확인", onDone, Modifier.weight(1.4f))
+        }
+      }
+      Handoff.Manual -> {
+        Result("내비에 연결하지 못했어요", "내비에서 직접 입력해 주세요 · 목적지: ${n.region.sido} ${n.region.name}")
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+          GhostButton("다시 보내기", onStart, Modifier.weight(1f))
+          StampButton("확인", onDone, Modifier.weight(1.4f))
+        }
       }
     }
   }
@@ -243,4 +251,10 @@ private fun Result(title: String, body: String) {
     Spacer(Modifier.height(4.dp))
     Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
   }
+}
+
+/** "을" after a final consonant (받침), otherwise "를". */
+internal fun objectParticle(word: String): String {
+  val c = word.lastOrNull() ?: return "를"
+  return if (c in '가'..'힣' && (c - '가') % 28 != 0) "을" else "를"
 }

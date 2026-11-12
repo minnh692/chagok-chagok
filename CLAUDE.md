@@ -79,7 +79,9 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - NaviHelper `requestRoute(RouteInfo)` (permission `NAVI_ROUTE_SEARCH`) works: the navigation opens its route search
   to the coordinate (from its own fixed position) and auto-starts guidance after a countdown. But our process receives
   NO listener events at all (no onRoutingCompleted/onRouteStarted, and no answers to getDestinationInfo /
-  getRouteStateInfo) even with `NAVI_ROUTE` granted, so the app's 5 s timeout always fires on the emulator.
+  getRouteStateInfo) even with `NAVI_ROUTE` granted, so the app treats "sent, no event within 1.5 s" as SENT.
+  The navigation ignores `geo:` NAVIGATE and SEARCH intents (no search is filled in), so `requestRoute` is the only route hand-off.
+  A cold-started navigation drops a request that arrives while it is loading; once running it opens the search (shown as "다시 보내기").
   Both `pleos.car.permission.NAVI_ROUTE*` permissions are granted at install.
   `getRecentDestinationInfo()` likewise gets no `onRecentDestinationInfo` answer, so the "빠진 도장" (J-1) flow is
   covered only by unit tests with a fake `RecentDestinationSource`.

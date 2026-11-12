@@ -62,11 +62,10 @@ sealed interface Handoff {
   data object Requesting : Handoff
   /** The navigation took the destination. */
   data object Started : Handoff
-  /**
-   * NaviHelper failed or did not answer in time; the navigation app was opened for manual entry.
-   * [maybeSent]: it timed out after the request went out, so the navigation may already show the destination.
-   */
-  data class Manual(val maybeSent: Boolean) : Handoff
+  /** The destination went to the navigation, which shows its route search; the navigation was brought forward. */
+  data object Sent : Handoff
+  /** NaviHelper failed or could not connect; the navigation app was opened for manual entry. */
+  data object Manual : Handoff
 }
 
 /** What the last parked check-in found. Shown at the top of the today screen. */
@@ -234,26 +233,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   }
 
   /**
-   * "안내 시작": remembers the destination region (code only) and asks the navigation for a route to the
+   * "내비로 안내" / "다시 보내기": opens the confirm for [code] and remembers the destination region (code only) and asks the navigation for a route to the
    * region's label point. On error or after [RouteRequester.TIMEOUT_MS], [openNavigationApp] is called instead.
    */
   fun startRoute(code: String, openNavigationApp: () -> Unit) {
     val region = _regions.value?.get(code) ?: return
     if (_handoff.value == Handoff.Requesting || _drivingRestricted.value) return
     prefs.edit().putString(KEY_NEXT_DESTINATION, code).apply()
+    _confirming.value = code
     _handoff.value = Handoff.Requesting
     viewModelScope.launch {
       val result = routeRequester.requestRoute(RouteTarget(region.name, region.fullName, region.labelLat, region.labelLon))
-      if (result == RouteResult.STARTED) {
-        _handoff.value = Handoff.Started
-      } else {
-        openNavigationApp()
-        _handoff.value = Handoff.Manual(maybeSent = result == RouteResult.TIMED_OUT)
+      _handoff.value = when (result) {
+        RouteResult.STARTED -> Handoff.Started
+        RouteResult.SENT -> Handoff.Sent.also { openNavigationApp() }
+        RouteResult.FAILED, RouteResult.TIMED_OUT -> Handoff.Manual.also { openNavigationApp() }
       }
     }
   }
 
-  /** The region chosen with "안내 시작", or null. Only the region code is stored. */
+  /** The region chosen with "내비로 안내", or null. Only the region code is stored. */
   val nextDestination: String? get() = prefs.getString(KEY_NEXT_DESTINATION, null)
 
   // --- Rest areas ---------------------------------------------------------------------------------

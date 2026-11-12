@@ -11,6 +11,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -24,6 +25,7 @@ class NaviHelperRouteRequester(context: Context) : RouteRequester {
   @SuppressLint("MissingPermission") // Declared in the manifest; a denial surfaces as an error / timeout.
   override suspend fun requestRoute(target: RouteTarget): RouteResult = withContext(Dispatchers.Main) {
     val answer = CompletableDeferred<RouteResult>()
+    val sent = CompletableDeferred<Unit>()
     val helper = NaviHelper(app)
     val listener = object : NaviHelperEventListener {
       override fun onRoutingCompleted() { answer.complete(RouteResult.STARTED) }
@@ -53,6 +55,7 @@ class NaviHelperRouteRequester(context: Context) : RouteRequester {
                 isMobileRequest = false,
               ),
             )
+            sent.complete(Unit)
           }.onFailure {
             Log.w(TAG, "requestRoute failed", it)
             answer.complete(RouteResult.FAILED)
@@ -63,7 +66,15 @@ class NaviHelperRouteRequester(context: Context) : RouteRequester {
           answer.complete(RouteResult.FAILED)
         },
       )
-      withTimeoutOrNull(RouteRequester.TIMEOUT_MS) { answer.await() } ?: RouteResult.TIMED_OUT
+      withTimeoutOrNull(RouteRequester.TIMEOUT_MS) {
+        select {
+          answer.onAwait { it }
+          sent.onAwait {
+            // Delivered; give the navigation a moment to confirm or reject it.
+            withTimeoutOrNull(RouteRequester.SENT_GRACE_MS) { answer.await() } ?: RouteResult.SENT
+          }
+        }
+      } ?: RouteResult.TIMED_OUT
     } catch (e: Exception) {
       if (e is kotlinx.coroutines.CancellationException) throw e
       Log.w(TAG, "NaviHelper unavailable", e)
