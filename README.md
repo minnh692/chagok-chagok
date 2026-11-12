@@ -4,6 +4,10 @@
 
 > 차를 세운 시·군·구마다 지도에 도장을 차곡차곡 찍어 주는 Pleos Connect 차량용 여행 기록 앱 (주차 중에만 사용)
 
+- **APK (release, 서명됨)**: [`apk/Nautilus_ChagokChagok_release.apk`](apk/Nautilus_ChagokChagok_release.apk)
+  ([바로 내려받기](https://github.com/minnh692/chagok-chagok/raw/main/apk/Nautilus_ChagokChagok_release.apk))
+- **개발·테스트 에뮬레이터**: Pleos Connect Emulator v2.1.0, 화면 2560×1440 (160 dpi)
+
 ## 주요 기능
 
 - **인트로**: 앱을 열면 종이 위에 차곡차곡 도장이 "쾅" 찍힌 뒤 앱으로 넘어갑니다(주차 중에만 움직이고, 탭하면 건너뜀). 아이콘도 같은 도장 로고입니다.
@@ -30,6 +34,19 @@
 
 필요한 것: Android Studio(내장 JBR), Android SDK, Pleos Connect Emulator v2.1.0 (API 34, x86_64)
 
+### 제출한 APK로 실행
+
+```bash
+# 에뮬레이터를 켠 뒤 (디버그 빌드가 깔려 있으면 서명이 달라 먼저 지웁니다: adb uninstall com.chagokchagok.app)
+adb install -r apk/Nautilus_ChagokChagok_release.apk
+adb shell am start -n com.chagokchagok.app/.MainActivity
+```
+
+처음 실행하면 위치 사용 동의 화면이 나옵니다. "위치 사용 동의하고 시작"을 누르고 Android 위치 권한을 허용하면 현재 위치에 첫 도장이 찍힙니다.
+에뮬레이터 런처의 앱 목록에서 "차곡차곡" 아이콘으로 실행해도 됩니다.
+
+### 소스에서 빌드해 실행
+
 ```bash
 # 빌드 (Windows cmd/PowerShell: gradlew.bat assembleDebug)
 ./gradlew assembleDebug
@@ -51,9 +68,12 @@ adb emu geo fix 126.4407 37.4602     # 인천광역시 영종구
 
 `./gradlew assembleRelease`는 저장소 밖의 `~/.chagok/keystore.properties`(storeFile, storePassword, keyAlias, keyPassword)가 있으면 그 키로 서명하고, 없으면 서명하지 않은 APK를 만듭니다. 키스토어와 비밀번호는 git에 올리지 않습니다.
 
-## 테스트 환경
+## 테스트 환경 및 필요한 설정
 
 - Pleos Connect Emulator v2.1.0 (`system-images;android-34;pleos_car_emulator;x86_64`), RAM 4 GB, cold boot
+- 화면 규격: 2560×1440, 160 dpi. 앱 창은 전체 폭에서 1682×1210 px, 화면 분할 시 841 px 폭이며 두 크기 모두에 맞춰 배치가 바뀝니다.
+- 필요한 설정: 별도 키·계정·서버 없음. 권한(위치, 차량 기어, 내비 경로 요청)은 첫 실행 때 묻거나 설치 시 부여됩니다.
+  주차(P) 상태여야 화면을 쓸 수 있고, 도장을 찍으려면 에뮬레이터 GPS 위치가 한국 안이어야 합니다(`adb emu geo fix`).
 - minSdk 28, targetSdk 34, compileSdk 36, Kotlin + Jetpack Compose, Gradle 9.1
 - Pleos Connect SDK: Vehicle 2.3.2, NaviHelper 3.0.5
 - 에뮬레이터에서는 Android `LocationManager`로 위치를 읽습니다(내장 내비게이션은 가상 GPS를 따르지 않습니다).
