@@ -61,7 +61,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   private val _checkIn = MutableStateFlow<CheckIn>(CheckIn.Idle)
   val checkIn: StateFlow<CheckIn> = _checkIn
 
-  private val _drivingRestricted = MutableStateFlow(false)
+  // Blocked until the car service reports otherwise: the app is distraction optimized, so it must never
+  // show its normal UI before it knows the car is parked.
+  private val _drivingRestricted = MutableStateFlow(true)
   val drivingRestricted: StateFlow<Boolean> = _drivingRestricted
 
   /** Debug builds can shift "today" to test day changes on the emulator (see MainActivity). */

@@ -12,18 +12,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.chagokchagok.app.ui.theme.Palette
 
 /**
  * Shown instead of the whole UI while driving restrictions are active.
- * Static on purpose: no buttons, no animation, nothing to read twice.
+ * Static on purpose: no buttons, no animation, nothing to read twice. Every touch is consumed here and
+ * nothing is focusable, so no input reaches the app while driving.
  */
 @Composable
 fun DrivingBlockScreen() {
   Column(
-    modifier = Modifier.fillMaxSize().background(Palette.Panel).padding(48.dp),
+    modifier = Modifier
+      .fillMaxSize()
+      .pointerInput(Unit) {
+        awaitPointerEventScope {
+          while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
+      }
+      .background(Palette.Panel)
+      .padding(48.dp),
     verticalArrangement = Arrangement.Center,
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {

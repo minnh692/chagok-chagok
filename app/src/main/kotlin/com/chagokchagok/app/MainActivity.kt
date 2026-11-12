@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
         val drivingRestricted by vm.drivingRestricted.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
+        // While driving, back does nothing either: the notice accepts no input at all.
+        BackHandler(enabled = drivingRestricted) {}
         // While driving, the notice replaces everything; the screen state is kept and comes back on parking.
         if (drivingRestricted) {
           DrivingBlockScreen()

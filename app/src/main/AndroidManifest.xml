@@ -22,8 +22,10 @@
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
 
     <!--
-        Parked-only app: intentionally NO distractionOptimized meta-data.
-        The UI is hidden while CarUxRestrictions require distraction optimization.
+        Parked-only app. The activity is declared distraction optimized so that our own static notice
+        ("주행 중에는 사용할 수 없어요") is shown instead of the system blocking screen. While
+        CarUxRestrictions require distraction optimization the app shows only that notice, accepts no
+        input, reads no location and stamps nothing (see car/CarStateMonitor.kt, ui/DrivingBlockScreen.kt).
     -->
     <application
         android:allowBackup="false"
@@ -35,6 +37,9 @@
         <activity
             android:name=".MainActivity"
             android:exported="true">
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -8,8 +8,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Watches AAOS driving restrictions through CarUxRestrictionsManager. The app does not declare
- * distraction optimization, so it replaces its whole UI with a static notice while restrictions are active.
+ * Watches AAOS driving restrictions through CarUxRestrictionsManager. The activity is declared distraction
+ * optimized, so the system does not hide it; the app itself replaces its whole UI with a static notice
+ * while restrictions are active.
  *
  * Parked detection in P0 is "no driving restrictions". TODO(parked): also check the gear with the Pleos
  * Vehicle SDK (`Vehicle.getGear()`), since IGNITION_STATE is not exposed on Pleos Connect.
@@ -19,15 +20,24 @@ class CarStateMonitor(context: Context) {
   private var car: Car? = null
   private var uxManager: CarUxRestrictionsManager? = null
 
-  /** True while driving restrictions are active. False when the Car service is unavailable. */
-  private val _uxRestricted = MutableStateFlow(false)
+  /**
+   * True while driving restrictions are active. Starts true (blocked) until the first reading;
+   * false when the device has no Car service (not a car), so the app stays usable there.
+   */
+  private val _uxRestricted = MutableStateFlow(true)
   val uxRestricted: StateFlow<Boolean> = _uxRestricted
 
   fun start() {
     if (car != null) return
-    val connected = runCatching { Car.createCar(appContext) }.getOrNull() ?: return
+    val connected = runCatching { Car.createCar(appContext) }.getOrNull()
+    if (connected == null) {
+      publish(false)
+      return
+    }
     car = connected
-    uxManager = (connected.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager)?.also { manager ->
+    val manager = connected.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager
+    if (manager == null) publish(false)
+    uxManager = manager?.also { manager ->
       publish(manager.currentCarUxRestrictions?.isRequiresDistractionOptimization ?: false)
       manager.registerListener { restrictions -> publish(restrictions.isRequiresDistractionOptimization) }
     }

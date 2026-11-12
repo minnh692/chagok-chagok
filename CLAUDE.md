@@ -77,8 +77,10 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 ## Project rules
 
 - Store only the region (si/gun/gu) and the date. Never persist raw coordinates or exact times.
-- No UI while driving: the manifest does NOT declare distraction optimization; hide the screen whenever
-  CarUxRestrictions require distraction optimization (see `car/CarStateMonitor.kt`).
+- No UI while driving: the activity IS declared `distractionOptimized` (so our own notice shows instead of the
+  system blocking screen). While CarUxRestrictions require distraction optimization the whole UI is replaced by
+  a static notice that consumes all input; restricted is the default until the car service reports otherwise
+  (see `car/CarStateMonitor.kt`, `ui/DrivingBlockScreen.kt`).
 - Read location through one interface (`location/LocationSource.kt`): NaviHelper on real cars, LocationManager on the emulator.
 - No external map SDKs or API keys. Region boundaries are drawn from bundled data.
 - Stay under ~400 MB memory. No always-on background work; work only while the activity is started.
