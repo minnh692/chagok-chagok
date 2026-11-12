@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paper behind the logo stamp (design/logo/). Used by the launcher icon and the system splash. -->
+    <color name="chagok_paper">#F5ECE0</color>
+</resources>

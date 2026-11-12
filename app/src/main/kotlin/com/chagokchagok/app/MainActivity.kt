@@ -24,6 +24,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.chagokchagok.app.ui.theme.Palette
 import androidx.core.content.ContextCompat
@@ -36,6 +39,7 @@ import com.chagokchagok.app.ui.AppViewModel
 import com.chagokchagok.app.ui.DrivingBlockScreen
 import com.chagokchagok.app.ui.Screen
 import com.chagokchagok.app.ui.consent.ConsentScreen
+import com.chagokchagok.app.ui.intro.IntroScreen
 import com.chagokchagok.app.ui.home.HomeScreen
 import com.chagokchagok.app.ui.map.MapFilter
 import com.chagokchagok.app.ui.map.fillColors
@@ -92,6 +96,14 @@ class MainActivity : ComponentActivity() {
         val arrival by vm.arrival.collectAsStateWithLifecycle()
         val restProgress by vm.restProgress.collectAsStateWithLifecycle()
         val missed by vm.missed.collectAsStateWithLifecycle()
+
+        // Launch intro (the logo stamp), once per launch; kept across recreation such as window resizes.
+        // It moves only while parked and gives way to the driving notice (see IntroScreen).
+        var showIntro by rememberSaveable { mutableStateOf(true) }
+        if (showIntro) {
+          IntroScreen(drivingRestricted = drivingRestricted, onFinished = { showIntro = false })
+          return@ChagokChagokTheme
+        }
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.

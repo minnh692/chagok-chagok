@@ -108,6 +108,8 @@ PowerShell: use `.\gradlew.bat assembleDebug`. Never redirect adb binary output 
 - Stored fields: region code, date (yyyy-MM-dd), order within the day, companion, memo; P1 adds rest-area id + date,
   the chosen next-stamp destination (region code only) and salted SHA-256 hashes of seen navigation destinations.
   Never persist coordinates, routes, or times of day.
+- The launch intro (`ui/intro/IntroScreen.kt`) moves only while parked: while driving, or while the car state is still
+  unknown, it shows the logo still and hands over to the driving notice; it plays once per launch, not on window resizes.
 - No UI while driving: the activity IS declared `distractionOptimized` (so our own notice shows instead of the
   system blocking screen). While CarUxRestrictions require distraction optimization the whole UI is replaced by
   a static notice that consumes all input; restricted is the default until the car service reports otherwise
