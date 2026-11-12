@@ -10,7 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -44,6 +53,9 @@ data class MapPin(val code: String, val title: String, val tag: String, val sub:
  * @param pins today's stamps in order. With 2+ a curved white dotted line joins them; each gets a label card.
  * @param topInset / bottomInset space kept free for the header and the tabs.
  * @param veil drawn over everything (used while driving), or null.
+ * @param selected region drawn with a dark outline, or null.
+ * @param onTap when set, the map can be pinched, double-tapped and dragged, and a tap reports the
+ *   (longitude, latitude) under the finger. Null keeps the map static and ignores touches.
  */
 @Composable
 fun StampMap(
@@ -54,18 +66,51 @@ fun StampMap(
   topInset: Dp = 0.dp,
   bottomInset: Dp = 0.dp,
   veil: Color? = null,
+  selected: String? = null,
+  onTap: ((lon: Double, lat: Double) -> Unit)? = null,
 ) {
-  BoxWithConstraints(modifier) {
+  BoxWithConstraints(modifier.clipToBounds()) {
     val density = LocalDensity.current
-    val fit = with(density) {
-      geometry?.let { fit(it, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), 24.dp.toPx(), topInset.toPx(), bottomInset.toPx()) }
+    val width = constraints.maxWidth.toFloat()
+    val height = constraints.maxHeight.toFloat()
+    val base = with(density) {
+      geometry?.let { fit(it, width, height, 24.dp.toPx(), topInset.toPx(), bottomInset.toPx()) }
     }
+    // User zoom and pan on top of the fitted map; 1x / zero when the map is static.
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var pan by remember { mutableStateOf(Offset.Zero) }
+    val fit = base?.let { MapFit(it.left * zoom + pan.x, it.top * zoom + pan.y, it.scale * zoom) }
     // Pins in screen pixels, in visiting order.
     val points = remember(geometry, fit, pins) {
       if (geometry == null || fit == null) emptyList() else pins.mapNotNull { pin -> geometry.labels[pin.code]?.let(fit::toScreen) }
     }
+    val gestures = if (onTap == null || geometry == null || base == null) {
+      Modifier
+    } else {
+      // Keeps the zoomed map covering the view: pan stays within what the extra zoom added.
+      fun clamp(z: Float, p: Offset) = Offset(p.x.coerceIn(width * (1 - z), 0f), p.y.coerceIn(height * (1 - z), 0f))
+      fun zoomAround(center: Offset, newZoom: Float, extraPan: Offset = Offset.Zero) {
+        val z = newZoom.coerceIn(1f, MAX_ZOOM)
+        pan = clamp(z, center - (center - pan) * (z / zoom) + extraPan)
+        zoom = z
+      }
+      Modifier
+        .pointerInput(geometry, base) {
+          detectTransformGestures { centroid, dragged, factor, _ -> zoomAround(centroid, zoom * factor, dragged) }
+        }
+        .pointerInput(geometry, base, onTap) {
+          detectTapGestures(
+            onDoubleTap = { at -> zoomAround(at, if (zoom < MAX_ZOOM / 2) zoom * DOUBLE_TAP_ZOOM else 1f) },
+            onTap = { at ->
+              val f = MapFit(base.left * zoom + pan.x, base.top * zoom + pan.y, base.scale * zoom)
+              val (lon, lat) = geometry.unproject((at.x - f.left) / f.scale, (at.y - f.top) / f.scale)
+              onTap(lon, lat)
+            },
+          )
+        }
+    }
 
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(Modifier.fillMaxSize().then(gestures)) {
       drawRect(Palette.Sea)
       val geo = geometry ?: return@Canvas
       val f = fit ?: return@Canvas
@@ -75,6 +120,9 @@ fun StampMap(
       }) {
         for ((code, path) in geo.regionPaths) drawPath(path, fills[code] ?: Palette.Land)
         drawPath(geo.borders, Palette.RegionBorder, style = Stroke(width = 1.dp.toPx() / f.scale))
+        selected?.let(geo::path)?.let { path ->
+          drawPath(path, Palette.Selected, style = Stroke(width = 4.dp.toPx() / f.scale, join = StrokeJoin.Round))
+        }
       }
       if (veil == null) drawRoute(points)
       if (veil != null) drawRect(veil)
@@ -85,6 +133,9 @@ fun StampMap(
     }
   }
 }
+
+private const val MAX_ZOOM = 12f
+private const val DOUBLE_TAP_ZOOM = 2.5f
 
 /** Where the map sits inside the canvas: map units -> screen pixels. */
 private data class MapFit(val left: Float, val top: Float, val scale: Float) {
@@ -155,6 +206,8 @@ private fun PinLabels(pins: List<MapPin>, points: List<Offset>, modifier: Modifi
     val taken = points.map { IntRect(it.x.roundToInt() - pinBox, it.y.roundToInt() - pinBox, it.x.roundToInt() + pinBox, it.y.roundToInt() + pinBox) }.toMutableList()
     val spots = placeables.mapIndexed { i, placeable ->
       val p = points.getOrNull(i) ?: return@mapIndexed null
+      // A pin scrolled out of a zoomed map takes its label with it.
+      if (p.x < 0 || p.y < 0 || p.x > maxW || p.y > maxH) return@mapIndexed null
       val px = p.x.roundToInt()
       val py = p.y.roundToInt()
       val w = placeable.width

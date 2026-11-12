@@ -36,7 +36,7 @@ import kotlinx.coroutines.withContext
 data class Completion(val id: String, val progress: CollectionProgress?, val seasonRegion: Region?)
 
 /** Top-level screens. The today screen is home; every other screen goes back to it. */
-enum class Screen { CONSENT, TODAY }
+enum class Screen { CONSENT, TODAY, MY_MAP }
 
 /** What the last parked check-in found. Shown at the top of the today screen. */
 sealed interface CheckIn {
@@ -185,6 +185,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
   fun openConsent() {
     _screen.value = Screen.CONSENT
+  }
+
+  fun openMyMap() {
+    _screen.value = Screen.MY_MAP
   }
 
   /** Back from any screen returns to the today screen. Returns false when already there. */

@@ -18,6 +18,8 @@ object Palette {
   // Labels drawn on the map
   val MapLabel = Color(0xE6FFFFFF)
   val MapLabelText = Color(0xFF1B1D21)
+  /** Outline of the region picked on "나의 지도". */
+  val Selected = Color(0xFF111418)
   val MapLabelSub = Color(0xFF59544D)
 
   // Panels and text

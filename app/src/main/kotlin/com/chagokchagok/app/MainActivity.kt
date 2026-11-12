@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import com.chagokchagok.app.ui.mymap.MyMapScreen
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -103,6 +104,16 @@ class MainActivity : ComponentActivity() {
             collections = collections,
             completions = completions,
             onDismissCompletion = vm::dismissCompletion,
+            onOpenMyMap = vm::openMyMap,
+          )
+          Screen.MY_MAP -> MyMapScreen(
+            regions = regions,
+            geometry = geometry,
+            book = book,
+            filter = filter,
+            collections = collections,
+            onFilter = vm::setFilter,
+            onBack = { vm.back() },
           )
         }
       }

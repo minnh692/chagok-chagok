@@ -27,6 +27,11 @@ class MapGeometry private constructor(index: RegionIndex) {
   /** One filled Path per region code. */
   val regionPaths: List<Pair<String, Path>>
 
+  private val pathByCode: Map<String, Path> by lazy { regionPaths.toMap() }
+
+  /** The filled Path of one region, or null for an unknown code. */
+  fun path(code: String): Path? = pathByCode[code]
+
   /** Every outline in one Path, stroked in a single draw call. */
   val borders = Path()
 
@@ -49,6 +54,10 @@ class MapGeometry private constructor(index: RegionIndex) {
     ((lon - bounds.minLon) * lonScale).toFloat(),
     ((bounds.maxLat - lat) * UNITS_PER_DEGREE).toFloat(),
   )
+
+  /** Inverse of [project]: map units to (lon, lat). */
+  fun unproject(x: Float, y: Float): Pair<Double, Double> =
+    (x / lonScale + bounds.minLon) to (bounds.maxLat - y / UNITS_PER_DEGREE)
 
   /** Adds a ring, dropping points closer than [SIMPLIFY_DEGREES] to the last kept one (well under a pixel). */
   private fun addRing(path: Path, ring: DoubleArray) {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.chagokchagok.app.ui.components.GhostButton
 import com.chagokchagok.app.ui.components.MapLegend
 import com.chagokchagok.app.ui.components.StatusPill
 import com.chagokchagok.app.ui.components.eyebrowDate
@@ -80,6 +81,7 @@ fun HomeScreen(
   collections: Collections?,
   completions: List<Completion>,
   onDismissCompletion: (String) -> Unit,
+  onOpenMyMap: () -> Unit,
 ) {
   val progress = remember(book, collections) { collections?.progress(book).orEmpty() }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
@@ -148,6 +150,8 @@ fun HomeScreen(
       }
       Spacer(Modifier.height(28.dp))
       TodayStampList(book, regions)
+      Spacer(Modifier.height(16.dp))
+      GhostButton("나의 지도 크게 보기", onOpenMyMap, Modifier.fillMaxWidth())
       val started = remember(progress) { startedCollections(progress) }
       if (started.isNotEmpty()) {
         Spacer(Modifier.height(28.dp))
