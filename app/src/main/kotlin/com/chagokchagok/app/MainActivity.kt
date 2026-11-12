@@ -61,11 +61,13 @@ class MainActivity : ComponentActivity() {
         val consent by vm.consent.collectAsStateWithLifecycle()
         val book by vm.book.collectAsStateWithLifecycle()
         val checkIn by vm.checkIn.collectAsStateWithLifecycle()
+        val regions by vm.regions.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY) { vm.back() }
         when (screen) {
           Screen.CONSENT -> ConsentScreen(onAccept = ::acceptConsent, onLater = vm::declineConsent)
           Screen.TODAY -> HomeScreen(
+            regions = regions,
             book = book,
             consent = consent,
             checkIn = checkIn,
