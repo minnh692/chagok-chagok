@@ -3,6 +3,7 @@ package com.chagokchagok.app.car
 import android.car.Car
 import android.car.drivingstate.CarUxRestrictionsManager
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -27,11 +28,14 @@ class CarStateMonitor(context: Context) {
     val connected = runCatching { Car.createCar(appContext) }.getOrNull() ?: return
     car = connected
     uxManager = (connected.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager)?.also { manager ->
-      _uxRestricted.value = manager.currentCarUxRestrictions?.isRequiresDistractionOptimization ?: false
-      manager.registerListener { restrictions ->
-        _uxRestricted.value = restrictions.isRequiresDistractionOptimization
-      }
+      publish(manager.currentCarUxRestrictions?.isRequiresDistractionOptimization ?: false)
+      manager.registerListener { restrictions -> publish(restrictions.isRequiresDistractionOptimization) }
     }
+  }
+
+  private fun publish(restricted: Boolean) {
+    if (_uxRestricted.value != restricted) Log.i(TAG, "driving restrictions active=$restricted")
+    _uxRestricted.value = restricted
   }
 
   fun stop() {
@@ -39,5 +43,9 @@ class CarStateMonitor(context: Context) {
     uxManager = null
     car?.disconnect()
     car = null
+  }
+
+  private companion object {
+    const val TAG = "ChagokCar"
   }
 }

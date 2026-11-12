@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.chagokchagok.app.car.CarStateMonitor
 import com.chagokchagok.app.ui.AppViewModel
+import com.chagokchagok.app.ui.DrivingBlockScreen
 import com.chagokchagok.app.ui.Screen
 import com.chagokchagok.app.ui.consent.ConsentScreen
 import com.chagokchagok.app.ui.home.HomeScreen
@@ -63,8 +64,14 @@ class MainActivity : ComponentActivity() {
         val checkIn by vm.checkIn.collectAsStateWithLifecycle()
         val regions by vm.regions.collectAsStateWithLifecycle()
         val filter by vm.filter.collectAsStateWithLifecycle()
+        val drivingRestricted by vm.drivingRestricted.collectAsStateWithLifecycle()
 
-        BackHandler(enabled = screen != Screen.TODAY) { vm.back() }
+        BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
+        // While driving, the notice replaces everything; the screen state is kept and comes back on parking.
+        if (drivingRestricted) {
+          DrivingBlockScreen()
+          return@ChagokChagokTheme
+        }
         when (screen) {
           Screen.CONSENT -> ConsentScreen(onAccept = ::acceptConsent, onLater = vm::declineConsent)
           Screen.TODAY -> HomeScreen(
