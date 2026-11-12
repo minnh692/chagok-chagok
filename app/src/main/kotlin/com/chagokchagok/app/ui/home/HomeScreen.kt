@@ -35,7 +35,12 @@ import com.chagokchagok.app.ui.map.todayPins
 import com.chagokchagok.app.ui.theme.Eyebrow
 import com.chagokchagok.app.ui.today.NaviPromptCard
 import java.time.LocalDate
+import com.chagokchagok.app.collection.Collections
 import com.chagokchagok.app.consent.LocationConsent
+import com.chagokchagok.app.ui.Completion
+import com.chagokchagok.app.ui.today.CollectionChips
+import com.chagokchagok.app.ui.today.CompletionCard
+import com.chagokchagok.app.ui.today.startedCollections
 import com.chagokchagok.app.data.CompanionType
 import com.chagokchagok.app.data.StampBook
 import com.chagokchagok.app.region.RegionIndex
@@ -72,7 +77,11 @@ fun HomeScreen(
   onOpenNavi: () -> Unit,
   onDismissNavi: () -> Unit,
   onSaveMemo: (stampId: Long, memo: String) -> Unit,
+  collections: Collections?,
+  completions: List<Completion>,
+  onDismissCompletion: (String) -> Unit,
 ) {
+  val progress = remember(book, collections) { collections?.progress(book).orEmpty() }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
   val fills = remember(fillsByCode) { fillColors(fillsByCode) }
   // Today's route belongs to "my map"; companion tabs only show which regions were shared.
@@ -128,6 +137,10 @@ fun HomeScreen(
       } else {
         ConsentOffBanner(onTurnOn = onTurnOnLocation)
       }
+      completions.firstOrNull()?.let { c ->
+        Spacer(Modifier.height(16.dp))
+        CompletionCard(c, onDismiss = { onDismissCompletion(c.id) })
+      }
       // In a split the other window is usually the navigation already, so the nudge is only for full width.
       if (naviPrompt && wide) {
         Spacer(Modifier.height(16.dp))
@@ -135,6 +148,11 @@ fun HomeScreen(
       }
       Spacer(Modifier.height(28.dp))
       TodayStampList(book, regions)
+      val started = remember(progress) { startedCollections(progress) }
+      if (started.isNotEmpty()) {
+        Spacer(Modifier.height(28.dp))
+        CollectionChips(started)
+      }
       Spacer(Modifier.height(28.dp))
       CompanionChips(
         selected = book.todayCompanion,

@@ -71,6 +71,8 @@ class MainActivity : ComponentActivity() {
         val drivingRestricted by vm.drivingRestricted.collectAsStateWithLifecycle()
         val naviPrompt by vm.naviPrompt.collectAsStateWithLifecycle()
         val geometry = rememberMapGeometry(regions)
+        val collections by vm.collections.collectAsStateWithLifecycle()
+        val completions by vm.completions.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.
@@ -98,6 +100,9 @@ class MainActivity : ComponentActivity() {
             onOpenNavi = ::openNavigation,
             onDismissNavi = vm::dismissNaviPrompt,
             onSaveMemo = vm::saveMemo,
+            collections = collections,
+            completions = completions,
+            onDismissCompletion = vm::dismissCompletion,
           )
         }
       }

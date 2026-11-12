@@ -3,6 +3,9 @@ package com.chagokchagok.app.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.chagokchagok.app.collection.CoastalRegions
+import com.chagokchagok.app.collection.CollectionProgress
+import com.chagokchagok.app.collection.Collections
 import com.chagokchagok.app.consent.ConsentStore
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.data.AppDatabase
@@ -28,6 +31,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** A collection that was just completed: a set ([progress]) or a two-season region ([seasonRegion]). */
+data class Completion(val id: String, val progress: CollectionProgress?, val seasonRegion: Region?)
 
 /** Top-level screens. The today screen is home; every other screen goes back to it. */
 enum class Screen { CONSENT, TODAY }
@@ -96,6 +102,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
   private var checkInJob: Job? = null
 
+  // --- Collections ----------------------------------------------------------------------------
+  private val _collections = MutableStateFlow<Collections?>(null)
+  val collections: StateFlow<Collections?> = _collections
+
+  /** Collections completed while the app is open, newest last; shown as cards until dismissed. Not stored. */
+  private val _completions = MutableStateFlow<List<Completion>>(emptyList())
+  val completions: StateFlow<List<Completion>> = _completions
+
+  /**
+   * Compares completed collections between stored-stamp updates. The first reading after launch is the baseline,
+   * so only collections completed from now on (a new stamp, a companion choice) are announced.
+   */
+  private fun watchCompletions() {
+    viewModelScope.launch {
+      // The stamps as stored when the app opened. Collections may finish loading after a check-in already
+      // stamped, so the baseline is computed from this snapshot, not from whatever is stored by then.
+      var opening: List<com.chagokchagok.app.data.StampEntity>? = null
+      var baseline: Set<String>? = null
+      combine(repository.observeStamps(), _today, _collections) { stamps, day, c -> Triple(stamps, day, c) }
+        .collect { (stamps, day, c) ->
+          if (opening == null) opening = stamps
+          if (c == null) return@collect
+          val book = StampBook(stamps, day.toString())
+          val done = withContext(Dispatchers.Default) { c.completedIds(book) }
+          val previous = baseline ?: withContext(Dispatchers.Default) {
+            c.completedIds(StampBook(opening.orEmpty(), day.toString()))
+          }
+          baseline = done
+          val fresh = (done - previous).sorted()
+          if (fresh.isEmpty()) return@collect
+          val byId = c.progress(book).associateBy { it.id }
+          _completions.value = _completions.value + fresh.map { id ->
+            val code = id.removePrefix("${Collections.SEASON_ID}:")
+            Completion(id, byId[id], if (id.startsWith("${Collections.SEASON_ID}:")) _regions.value?.get(code) else null)
+          }
+        }
+    }
+  }
+
+  fun dismissCompletion(id: String) {
+    _completions.value = _completions.value.filterNot { it.id == id }
+  }
+
   // --- Navigation prompt ------------------------------------------------------------------------
   // Only the date the prompt was dismissed is kept (no place, no time of day).
   private val prefs = app.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
@@ -122,7 +171,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
   init {
     // Parse and index the bundled boundaries once per process.
-    viewModelScope.launch { _regions.value = RegionAssets.load(app) }
+    viewModelScope.launch {
+      val index = RegionAssets.load(app)
+      _regions.value = index
+      _collections.value = withContext(Dispatchers.Default) { Collections(index, CoastalRegions.derive(index)) }
+    }
+    watchCompletions()
   }
 
   private fun currentDay(): LocalDate = LocalDate.now().plusDays(dayOffset)
