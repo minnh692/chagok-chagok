@@ -24,6 +24,10 @@ import com.chagokchagok.app.ui.DrivingBlockScreen
 import com.chagokchagok.app.ui.Screen
 import com.chagokchagok.app.ui.consent.ConsentScreen
 import com.chagokchagok.app.ui.home.HomeScreen
+import com.chagokchagok.app.ui.map.MapFilter
+import com.chagokchagok.app.ui.map.fillColors
+import com.chagokchagok.app.ui.map.mapFills
+import com.chagokchagok.app.ui.map.rememberMapGeometry
 import com.chagokchagok.app.ui.theme.ChagokChagokTheme
 import kotlinx.coroutines.launch
 
@@ -65,28 +69,34 @@ class MainActivity : ComponentActivity() {
         val regions by vm.regions.collectAsStateWithLifecycle()
         val filter by vm.filter.collectAsStateWithLifecycle()
         val drivingRestricted by vm.drivingRestricted.collectAsStateWithLifecycle()
+        val naviPrompt by vm.naviPrompt.collectAsStateWithLifecycle()
+        val geometry = rememberMapGeometry(regions)
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.
         BackHandler(enabled = drivingRestricted) {}
         // While driving, the notice replaces everything; the screen state is kept and comes back on parking.
         if (drivingRestricted) {
-          DrivingBlockScreen()
+          DrivingBlockScreen(geometry, fillColors(mapFills(book, MapFilter.MINE)))
           return@ChagokChagokTheme
         }
         when (screen) {
           Screen.CONSENT -> ConsentScreen(onAccept = ::acceptConsent, onLater = vm::declineConsent)
           Screen.TODAY -> HomeScreen(
             regions = regions,
+            geometry = geometry,
             book = book,
             consent = consent,
             checkIn = checkIn,
             filter = filter,
+            naviPrompt = naviPrompt,
             onFilter = vm::setFilter,
             onCompanion = vm::setTodayCompanion,
             onTurnOnLocation = vm::openConsent,
             onRetry = { vm.checkIn(hasLocationPermission()) },
             onRequestPermission = ::requestLocationPermission,
+            onOpenNavi = ::openNavigation,
+            onDismissNavi = vm::dismissNaviPrompt,
           )
         }
       }
@@ -100,6 +110,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
+    vm.naviAvailable.value = packageManager.resolveActivity(navigationIntent(), 0) != null
     vm.checkIn(hasLocationPermission())
   }
 
@@ -123,6 +134,16 @@ class MainActivity : ComponentActivity() {
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
       )
     }
+  }
+
+  /** The car's navigation app, found by the standard maps category (no package name is assumed). */
+  private fun navigationIntent(): Intent =
+    Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MAPS)
+
+  private fun openNavigation() {
+    vm.dismissNaviPrompt()
+    // Its own task, so the navigation does not stack on top of ours (reopening Chagok Chagok must show us).
+    runCatching { startActivity(navigationIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
   }
 
   private fun hasLocationPermission() =

@@ -16,4 +16,8 @@ val Typography = Typography(
   bodyMedium = TextStyle(fontSize = 20.sp, lineHeight = 28.sp),
   labelLarge = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
   labelMedium = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+  labelSmall = TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
 )
+
+/** Small spaced-out red line above a heading ("PARKED · 11.12 THU"). Same as Typography.labelSmall. */
+val Eyebrow: TextStyle get() = Typography.labelSmall

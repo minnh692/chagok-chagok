@@ -18,6 +18,14 @@
 
     <!-- Pleos NaviHelper (pleos.car.permission.NAVI_ROUTE) is not used in P0; see NaviHelperLocationSource. -->
 
+    <!-- Lets the app check that a navigation app exists before offering "내비 켜기" (package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_MAPS" />
+        </intent>
+    </queries>
+
     <!-- AAOS car properties (gear / ignition), for parked detection -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
 

@@ -5,22 +5,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chagokchagok.app.data.StampResult
 import com.chagokchagok.app.ui.CheckIn
-import com.chagokchagok.app.ui.theme.MinTouch
+import com.chagokchagok.app.ui.components.StampButton
+import com.chagokchagok.app.ui.theme.Eyebrow
 import com.chagokchagok.app.ui.theme.Palette
 
 /** Banner shown on the today screen while location consent is declined. */
@@ -65,9 +62,9 @@ fun CheckInCard(
 private fun ResultCard(done: CheckIn.Done, modifier: Modifier) {
   val region = done.region.fullName
   val (badge, color, line) = when (val r = done.result) {
-    is StampResult.New -> Triple("STAMPED!", Palette.StampedToday, "오늘 ${r.newToday} NEW STAMPS")
-    is StampResult.AlreadyStamped -> Triple("ALREADY STAMPED", Palette.TextSecondary, "오늘 이미 찍은 도장이에요")
-    is StampResult.WelcomeBack -> Triple("WELCOME BACK", Palette.StampedBefore, "${r.visitCount}번째 방문이에요")
+    is StampResult.New -> Triple("STAMPED!", Palette.StampedToday, "${region}에 도장을 찍었어요 · 오늘 ${r.newToday} NEW STAMPS")
+    is StampResult.AlreadyStamped -> Triple("ALREADY STAMPED", Palette.TextSecondary, "${region} · 오늘 이미 찍은 도장이에요")
+    is StampResult.WelcomeBack -> Triple("WELCOME BACK", Palette.StampedBefore, "${region} · ${r.visitCount}번째 방문이에요")
   }
   Column(
     modifier = modifier
@@ -75,11 +72,11 @@ private fun ResultCard(done: CheckIn.Done, modifier: Modifier) {
       .background(Palette.Card, RoundedCornerShape(20.dp))
       .padding(horizontal = 28.dp, vertical = 24.dp),
   ) {
-    Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black)
-    Spacer(Modifier.height(8.dp))
-    Text(region, style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+    Text("PARKED", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text(line, style = MaterialTheme.typography.titleMedium, color = Palette.TextSecondary)
+    Text(badge, color = color, fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+    Spacer(Modifier.height(8.dp))
+    Text(line, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal), color = Palette.TextSecondary)
   }
 }
 
@@ -101,12 +98,7 @@ private fun StatusCard(
     Text(body, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
     if (action != null) {
       Spacer(Modifier.height(16.dp))
-      Button(
-        onClick = action.second,
-        modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Palette.Primary, contentColor = Color.White),
-      ) { Text(action.first, style = MaterialTheme.typography.labelLarge) }
+      StampButton(action.first, action.second, Modifier.fillMaxWidth())
     }
   }
 }

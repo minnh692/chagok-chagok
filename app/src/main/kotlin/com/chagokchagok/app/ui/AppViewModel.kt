@@ -96,6 +96,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
   private var checkInJob: Job? = null
 
+  // --- Navigation prompt ------------------------------------------------------------------------
+  // Only the date the prompt was dismissed is kept (no place, no time of day).
+  private val prefs = app.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+  private val naviDismissedOn = MutableStateFlow(prefs.getString(KEY_NAVI_DISMISSED, null))
+
+  /** Whether the car has a navigation app to open; set by the activity. */
+  val naviAvailable = MutableStateFlow(false)
+
+  /**
+   * "다음 도장은 내비로 찾아가요": shown while parked once today's check-in has finished, until it is
+   * dismissed or used today.
+   */
+  val naviPrompt: StateFlow<Boolean> =
+    combine(consent, _checkIn, _today, naviDismissedOn, naviAvailable) { consent, checkIn, today, dismissed, available ->
+      available && consent == LocationConsent.GRANTED && checkIn is CheckIn.Done && dismissed != today.toString()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+  /** Hides the navigation prompt for the rest of today (called on both of its buttons). */
+  fun dismissNaviPrompt() {
+    val day = currentDay().toString()
+    prefs.edit().putString(KEY_NAVI_DISMISSED, day).apply()
+    naviDismissedOn.value = day
+  }
+
   init {
     // Parse and index the bundled boundaries once per process.
     viewModelScope.launch { _regions.value = RegionAssets.load(app) }
@@ -187,5 +211,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
       }
     }
+  }
+
+  private companion object {
+    const val PREFS = "settings"
+    const val KEY_NAVI_DISMISSED = "navi_prompt_dismissed_on"
   }
 }

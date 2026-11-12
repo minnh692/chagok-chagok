@@ -10,16 +10,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,7 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.chagokchagok.app.ui.theme.MinTouch
+import com.chagokchagok.app.ui.components.GhostButton
+import com.chagokchagok.app.ui.components.StampButton
 import com.chagokchagok.app.ui.theme.Palette
 
 /** First-run location consent: what is stored and what is not. */
@@ -82,19 +79,9 @@ fun ConsentScreen(onAccept: () -> Unit, onLater: () -> Unit) {
       )
       Spacer(Modifier.height(32.dp))
 
-      Button(
-        onClick = onAccept,
-        modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Palette.Primary, contentColor = Palette.OnPrimary),
-      ) { Text("위치 사용 동의하고 시작", style = MaterialTheme.typography.labelLarge) }
+      StampButton("위치 사용 동의하고 시작", onAccept, Modifier.fillMaxWidth())
       Spacer(Modifier.height(16.dp))
-      OutlinedButton(
-        onClick = onLater,
-        modifier = Modifier.fillMaxWidth().heightIn(min = MinTouch),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.Text),
-      ) { Text("나중에", style = MaterialTheme.typography.labelLarge) }
+      GhostButton("나중에", onLater, Modifier.fillMaxWidth())
     }
   }
 }

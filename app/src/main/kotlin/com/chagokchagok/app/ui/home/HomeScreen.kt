@@ -19,19 +19,27 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.chagokchagok.app.ui.components.MapLegend
+import com.chagokchagok.app.ui.components.StatusPill
+import com.chagokchagok.app.ui.components.eyebrowDate
+import com.chagokchagok.app.ui.map.fillColors
+import com.chagokchagok.app.ui.map.todayPins
+import com.chagokchagok.app.ui.theme.Eyebrow
+import com.chagokchagok.app.ui.today.NaviPromptCard
+import java.time.LocalDate
 import com.chagokchagok.app.consent.LocationConsent
 import com.chagokchagok.app.data.CompanionType
 import com.chagokchagok.app.data.StampBook
 import com.chagokchagok.app.region.RegionIndex
 import com.chagokchagok.app.ui.CheckIn
-import com.chagokchagok.app.ui.map.Fill
 import com.chagokchagok.app.ui.map.MapFilter
 import com.chagokchagok.app.ui.map.MapGeometry
 import com.chagokchagok.app.ui.map.MapTabs
@@ -50,49 +58,76 @@ import com.chagokchagok.app.ui.today.TodayStampList
 @Composable
 fun HomeScreen(
   regions: RegionIndex?,
+  geometry: MapGeometry?,
   book: StampBook,
   consent: LocationConsent,
   checkIn: CheckIn,
   filter: MapFilter,
+  naviPrompt: Boolean,
   onFilter: (MapFilter) -> Unit,
   onCompanion: (CompanionType?) -> Unit,
   onTurnOnLocation: () -> Unit,
   onRetry: () -> Unit,
   onRequestPermission: () -> Unit,
+  onOpenNavi: () -> Unit,
+  onDismissNavi: () -> Unit,
 ) {
-  val geometry by produceState<MapGeometry?>(null, regions) {
-    value = regions?.let { MapGeometry.of(it) }
-  }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
-  val fills = remember(fillsByCode) {
-    fillsByCode.mapValues { (_, fill) -> if (fill == Fill.TODAY) Palette.StampedToday else Palette.StampedBefore }
-  }
-  // The order line belongs to "my map"; companion tabs only show which regions were shared.
-  val orderCodes = remember(book, filter) {
-    if (filter == MapFilter.MINE) book.todayStamps.map { it.regionCode } else emptyList()
+  val fills = remember(fillsByCode) { fillColors(fillsByCode) }
+  // Today's route belongs to "my map"; companion tabs only show which regions were shared.
+  val pins = remember(book, filter, regions) {
+    if (filter == MapFilter.MINE) todayPins(book, regions) else emptyList()
   }
   val regionCount = regions?.size ?: TOTAL_REGIONS
+  val today = remember(book.today) { runCatching { LocalDate.parse(book.today) }.getOrDefault(LocalDate.now()) }
 
   val map = @Composable { modifier: Modifier, topInset: Dp ->
     Box(modifier) {
-      StampMap(geometry, fills, orderCodes, Modifier.fillMaxSize(), topInset)
-      MapHeader(fills.size, regionCount, filter, Modifier.padding(28.dp))
-      MapTabs(
-        selected = filter,
-        onSelect = onFilter,
-        modifier = Modifier
-          .align(Alignment.BottomCenter)
-          .padding(16.dp)
-          .horizontalScroll(rememberScrollState()),
+      StampMap(geometry, fills, pins, Modifier.fillMaxSize(), topInset = topInset, bottomInset = 96.dp)
+      // Keeps the header readable over the map.
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .height(220.dp)
+          .background(
+            Brush.verticalGradient(
+              0f to Palette.MapShade.copy(alpha = 0.97f),
+              0.5f to Palette.MapShade.copy(alpha = 0.8f),
+              1f to Palette.MapShade.copy(alpha = 0f),
+            ),
+          ),
       )
+      MapHeader(fills.size, regionCount, filter, today, Modifier.padding(28.dp))
+      StatusPill("주차 중", dot = Palette.Primary, modifier = Modifier.align(Alignment.TopEnd).padding(28.dp))
+      Column(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
+        horizontalAlignment = Alignment.End,
+      ) {
+        if (fills.isNotEmpty()) {
+          MapLegend()
+          Spacer(Modifier.height(12.dp))
+        }
+        MapTabs(
+          selected = filter,
+          onSelect = onFilter,
+          modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .horizontalScroll(rememberScrollState()),
+        )
+      }
     }
   }
-  val panel = @Composable { modifier: Modifier ->
+  val panel = @Composable { modifier: Modifier, wide: Boolean ->
     Column(modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
       if (consent == LocationConsent.GRANTED) {
         CheckInCard(checkIn, onRetry = onRetry, onRequestPermission = onRequestPermission)
       } else {
         ConsentOffBanner(onTurnOn = onTurnOnLocation)
+      }
+      // In a split the other window is usually the navigation already, so the nudge is only for full width.
+      if (naviPrompt && wide) {
+        Spacer(Modifier.height(16.dp))
+        NaviPromptCard(onOpenNavi = onOpenNavi, onDismiss = onDismissNavi)
       }
       Spacer(Modifier.height(28.dp))
       TodayStampList(book, regions)
@@ -109,17 +144,18 @@ fun HomeScreen(
     val panelWidth = maxWidth * 0.38f
     if (maxWidth > maxHeight) {
       Row(Modifier.fillMaxSize()) {
-        map(Modifier.weight(1f).fillMaxHeight(), 0.dp)
-        panel(Modifier.width(panelWidth).fillMaxHeight().background(Palette.Panel))
+        map(Modifier.weight(1f).fillMaxHeight(), 120.dp)
+        panel(Modifier.width(panelWidth).fillMaxHeight().background(Palette.Panel), true)
       }
     } else {
       Column(Modifier.fillMaxSize()) {
-        map(Modifier.fillMaxWidth().weight(0.55f), 88.dp)
+        map(Modifier.fillMaxWidth().weight(0.55f), 120.dp)
         panel(
           Modifier
             .fillMaxWidth()
             .weight(0.45f)
-            .background(Palette.Panel, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+            .background(Palette.Panel, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+          false,
         )
       }
     }
@@ -127,7 +163,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun MapHeader(count: Int, regionCount: Int, filter: MapFilter, modifier: Modifier = Modifier) {
+private fun MapHeader(count: Int, regionCount: Int, filter: MapFilter, today: LocalDate, modifier: Modifier = Modifier) {
   val scope = when (filter.companion) {
     null -> "전국 시·군·구"
     CompanionType.FAMILY -> "가족과 함께, 전국"
@@ -136,9 +172,15 @@ private fun MapHeader(count: Int, regionCount: Int, filter: MapFilter, modifier:
     CompanionType.ALONE -> "혼자서, 전국"
   }
   Column(modifier) {
-    Text("$count STAMPS", style = MaterialTheme.typography.displaySmall, color = Palette.Text)
+    Text("${eyebrowDate(today)}  ·  CHAGOK CHAGOK", style = Eyebrow, color = Palette.Primary)
     Spacer(Modifier.height(4.dp))
-    Text("$scope ${regionCount}곳 중 ${count}곳", style = MaterialTheme.typography.titleMedium, color = Palette.TextSecondary)
+    Text("$count STAMPS", style = MaterialTheme.typography.displaySmall.copy(letterSpacing = 1.sp), color = Palette.Text)
+    Spacer(Modifier.height(4.dp))
+    Text(
+      "$scope ${regionCount}곳 중 ${count}곳",
+      style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal),
+      color = Palette.TextSecondary,
+    )
   }
 }
 

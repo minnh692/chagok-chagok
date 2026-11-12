@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -50,28 +54,46 @@ fun TodayStampList(book: StampBook, regions: RegionIndex?, modifier: Modifier = 
       Text("아직 오늘 찍은 도장이 없어요.", style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
       return@Column
     }
-    book.todayStamps.forEach { stamp ->
-      val region = regions?.get(stamp.regionCode)
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(vertical = 4.dp)
-          .background(Palette.Card, RoundedCornerShape(16.dp))
-          .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Box(Modifier.size(40.dp).background(Palette.StampedToday, CircleShape), contentAlignment = Alignment.Center) {
-          Text("${stamp.dayOrder}", style = MaterialTheme.typography.labelLarge, color = Palette.OnPrimary)
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-          Text(region?.name ?: stamp.regionCode, style = MaterialTheme.typography.titleMedium, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-          Text(region?.sido.orEmpty(), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary, maxLines = 1)
-        }
-        if (book.isNewToday(stamp.regionCode)) {
-          Text("NEW", style = MaterialTheme.typography.labelLarge, color = Palette.StampedToday)
-        } else {
-          Text("${book.visitCount(stamp.regionCode)}번째 방문", style = MaterialTheme.typography.labelMedium, color = Palette.StampedBefore)
+    // A vertical timeline: numbered stops joined by a red line, in the order they were stamped.
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .background(Palette.Card, RoundedCornerShape(20.dp))
+        .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+      val last = book.todayStamps.lastIndex
+      book.todayStamps.forEachIndexed { i, stamp ->
+        val region = regions?.get(stamp.regionCode)
+        Row(
+          modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            modifier = Modifier
+              .width(40.dp)
+              .fillMaxHeight()
+              .drawBehind {
+                val x = size.width / 2
+                val w = 3.dp.toPx()
+                if (i > 0) drawLine(Palette.Primary, Offset(x, 0f), Offset(x, size.height / 2), w)
+                if (i < last) drawLine(Palette.Primary, Offset(x, size.height / 2), Offset(x, size.height), w)
+              },
+            contentAlignment = Alignment.Center,
+          ) {
+            Box(Modifier.size(40.dp).background(Palette.StampedToday, CircleShape), contentAlignment = Alignment.Center) {
+              Text("${stamp.dayOrder}", style = MaterialTheme.typography.labelLarge, color = Palette.OnPrimary)
+            }
+          }
+          Spacer(Modifier.width(16.dp))
+          Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
+            Text(region?.name ?: stamp.regionCode, style = MaterialTheme.typography.titleMedium, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(region?.sido.orEmpty(), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary, maxLines = 1)
+          }
+          if (book.isNewToday(stamp.regionCode)) {
+            Text("NEW", style = MaterialTheme.typography.labelLarge, color = Palette.StampedToday)
+          } else {
+            Text("${book.visitCount(stamp.regionCode)}번째 방문", style = MaterialTheme.typography.labelMedium, color = Palette.StampedBefore)
+          }
         }
       }
     }
@@ -96,8 +118,8 @@ fun CompanionChips(
           modifier = Modifier
             .weight(1f)
             .heightIn(min = MinTouch)
-            .background(if (isSelected) Palette.Primary else Palette.Card, RoundedCornerShape(38.dp))
-            .border(2.dp, if (isSelected) Palette.Primary else Palette.Divider, RoundedCornerShape(38.dp))
+            .background(if (isSelected) Palette.Primary else Palette.Card, CircleShape)
+            .border(1.5.dp, if (isSelected) Palette.Primary else Palette.Outline, CircleShape)
             .semantics { this.selected = isSelected }
             .clickable(enabled = enabled, role = Role.Button) { onSelect(if (isSelected) null else type) },
           contentAlignment = Alignment.Center,
