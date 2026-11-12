@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
         val recommendations by vm.recommendations.collectAsStateWithLifecycle()
         val confirming by vm.confirming.collectAsStateWithLifecycle()
         val handoff by vm.handoff.collectAsStateWithLifecycle()
+        val arrival by vm.arrival.collectAsStateWithLifecycle()
 
         BackHandler(enabled = screen != Screen.TODAY && !drivingRestricted) { vm.back() }
         // While driving, back does nothing either: the notice accepts no input at all.
@@ -109,6 +110,8 @@ class MainActivity : ComponentActivity() {
             completions = completions,
             onDismissCompletion = vm::dismissCompletion,
             onOpenMyMap = vm::openMyMap,
+            arrival = arrival,
+            onArrivalDone = vm::arrivalShown,
           )
           Screen.MY_MAP -> MyMapScreen(
             regions = regions,

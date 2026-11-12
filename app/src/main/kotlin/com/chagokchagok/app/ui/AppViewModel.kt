@@ -26,6 +26,7 @@ import com.chagokchagok.app.region.Region
 import com.chagokchagok.app.region.RegionAssets
 import com.chagokchagok.app.region.RegionFinder
 import com.chagokchagok.app.region.RegionIndex
+import com.chagokchagok.app.ui.map.Arrival
 import com.chagokchagok.app.ui.map.MapFilter
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -329,7 +330,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   fun setDrivingRestricted(restricted: Boolean): Boolean {
     val wasRestricted = _drivingRestricted.value
     _drivingRestricted.value = restricted
+    if (restricted) {
+      // Nothing animates while driving, and an interrupted arrival is not replayed later.
+      _arrival.value = null
+      arrivalArmed = false
+    } else if (wasRestricted) {
+      arrivalArmed = true
+    }
     return wasRestricted && !restricted
+  }
+
+  // --- Arrival animation ------------------------------------------------------------------------
+  /** Set when restrictions clear; the next check-in that stamps a new region plays the arrival once. */
+  private var arrivalArmed = false
+
+  private val _arrival = MutableStateFlow<Arrival?>(null)
+  val arrival: StateFlow<Arrival?> = _arrival
+
+  fun arrivalShown() {
+    _arrival.value = null
   }
 
   // --- Check-in ---------------------------------------------------------------------------------
@@ -347,6 +366,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
       return
     }
     if (checkInJob?.isActive == true) return
+    val animate = arrivalArmed
+    arrivalArmed = false
     checkInJob = viewModelScope.launch {
       _checkIn.value = CheckIn.Locating
       val regions = RegionAssets.load(getApplication())
@@ -360,7 +381,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
           if (region == null) {
             CheckIn.OutsideRegions
           } else {
-            CheckIn.Done(repository.stamp(region.code, currentDay()), region)
+            // The region stamped just before this one, for the arrival line (read before stamping).
+            val today = currentDay().toString()
+            val previous = book.value.stamps.filter { it.regionCode != region.code && it.date <= today }
+              .maxWithOrNull(compareBy({ it.date }, { it.dayOrder }))?.regionCode
+            val result = repository.stamp(region.code, currentDay())
+            if (result is StampResult.New) {
+              if (nextDestination == region.code) prefs.edit().remove(KEY_NEXT_DESTINATION).apply()
+              // Only first stamps animate, and only right after parking; never while restricted.
+              if (animate && !_drivingRestricted.value) _arrival.value = Arrival(previous, region.code)
+            }
+            CheckIn.Done(result, region)
           }
         }
       }

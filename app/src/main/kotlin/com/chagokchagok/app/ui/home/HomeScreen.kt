@@ -50,6 +50,7 @@ import com.chagokchagok.app.ui.map.MapFilter
 import com.chagokchagok.app.ui.map.MapGeometry
 import com.chagokchagok.app.ui.map.MapTabs
 import com.chagokchagok.app.ui.map.StampMap
+import com.chagokchagok.app.ui.map.Arrival
 import com.chagokchagok.app.ui.map.mapFills
 import com.chagokchagok.app.ui.theme.Palette
 import com.chagokchagok.app.ui.today.CheckInCard
@@ -82,6 +83,8 @@ fun HomeScreen(
   completions: List<Completion>,
   onDismissCompletion: (String) -> Unit,
   onOpenMyMap: () -> Unit,
+  arrival: Arrival?,
+  onArrivalDone: () -> Unit,
 ) {
   val progress = remember(book, collections) { collections?.progress(book).orEmpty() }
   val fillsByCode = remember(book, filter) { mapFills(book, filter) }
@@ -95,7 +98,11 @@ fun HomeScreen(
 
   val map = @Composable { modifier: Modifier, topInset: Dp ->
     Box(modifier) {
-      StampMap(geometry, fills, pins, Modifier.fillMaxSize(), topInset = topInset, bottomInset = 96.dp)
+      // The arrival plays on "my map" only.
+      StampMap(
+        geometry, fills, pins, Modifier.fillMaxSize(), topInset = topInset, bottomInset = 96.dp,
+        arrival = arrival.takeIf { filter == MapFilter.MINE }, onArrivalDone = onArrivalDone,
+      )
       // Keeps the header readable over the map.
       Box(
         Modifier

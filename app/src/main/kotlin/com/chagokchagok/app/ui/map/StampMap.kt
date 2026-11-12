@@ -16,6 +16,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import kotlin.math.atan2
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.StrokeJoin
@@ -55,6 +68,8 @@ data class MapPin(val code: String, val title: String, val tag: String, val sub:
  * @param veil drawn over everything (used while driving), or null.
  * @param selected region drawn with a dark outline, or null.
  * @param connectPins false draws the pins without the dotted line between them.
+ * @param arrival plays the arrival animation once (car along the dotted line, region fill, STAMPED!); the
+ *   caller passes null while driving restrictions are active. [onArrivalDone] is called when it ends.
  * @param onTap when set, the map can be pinched, double-tapped and dragged, and a tap reports the
  *   (longitude, latitude) under the finger. Null keeps the map static and ignores touches.
  */
@@ -70,6 +85,8 @@ fun StampMap(
   selected: String? = null,
   onTap: ((lon: Double, lat: Double) -> Unit)? = null,
   connectPins: Boolean = true,
+  arrival: Arrival? = null,
+  onArrivalDone: () -> Unit = {},
 ) {
   BoxWithConstraints(modifier.clipToBounds()) {
     val density = LocalDensity.current
@@ -82,10 +99,21 @@ fun StampMap(
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     val fit = base?.let { MapFit(it.left * zoom + pan.x, it.top * zoom + pan.y, it.scale * zoom) }
-    // Pins in screen pixels, in visiting order.
-    val points = remember(geometry, fit, pins) {
-      if (geometry == null || fit == null) emptyList() else pins.mapNotNull { pin -> geometry.labels[pin.code]?.let(fit::toScreen) }
+    // 0..1 over the arrival; 1 when there is none. Read only while drawing, so it redraws without recomposing.
+    val arrivalProgress = remember(arrival) { Animatable(if (arrival == null) 1f else 0f) }
+    LaunchedEffect(arrival) {
+      if (arrival == null) return@LaunchedEffect
+      arrivalProgress.animateTo(1f, tween(ARRIVAL_MS, easing = LinearEasing))
+      onArrivalDone()
     }
+    // The arriving region's pin and label appear once the stamp lands.
+    val arriving = arrival != null && arrivalProgress.value < 1f
+    val shownPins = if (arriving) pins.filter { it.code != arrival?.to } else pins
+    // Pins in screen pixels, in visiting order.
+    val points = remember(geometry, fit, shownPins) {
+      if (geometry == null || fit == null) emptyList() else shownPins.mapNotNull { pin -> geometry.labels[pin.code]?.let(fit::toScreen) }
+    }
+    val textMeasurer = rememberTextMeasurer()
     val gestures = if (onTap == null || geometry == null || base == null) {
       Modifier
     } else {
@@ -120,19 +148,120 @@ fun StampMap(
         translate(f.left, f.top)
         scale(f.scale, f.scale, pivot = Offset.Zero)
       }) {
-        for ((code, path) in geo.regionPaths) drawPath(path, fills[code] ?: Palette.Land)
+        val t = arrivalProgress.value
+        for ((code, path) in geo.regionPaths) {
+          val fill = fills[code]
+          if (fill != null && arrival != null && t < 1f && code == arrival.to) {
+            drawPath(path, Palette.Land)
+            drawPath(path, fill, alpha = arrivalFill(t, arrival.from != null))
+          } else {
+            drawPath(path, fill ?: Palette.Land)
+          }
+        }
         drawPath(geo.borders, Palette.RegionBorder, style = Stroke(width = 1.dp.toPx() / f.scale))
         selected?.let(geo::path)?.let { path ->
           drawPath(path, Palette.Selected, style = Stroke(width = 4.dp.toPx() / f.scale, join = StrokeJoin.Round))
         }
       }
       if (veil == null) drawRoute(points, connectPins)
+      if (veil == null && arrival != null && arrivalProgress.value < 1f) {
+        val to = geo.labels[arrival.to]?.let(f::toScreen)
+        val from = arrival.from?.let { geo.labels[it] }?.let(f::toScreen)
+        if (to != null) drawArrival(from, to, arrivalProgress.value, textMeasurer)
+      }
       if (veil != null) drawRect(veil)
     }
 
     if (veil == null && points.isNotEmpty()) {
-      PinLabels(pins, points, Modifier.fillMaxSize())
+      PinLabels(shownPins, points, Modifier.fillMaxSize())
     }
+  }
+}
+
+/** The arrival animation for a first stamp in [to], from the previous stamp's region [from] (if any). */
+data class Arrival(val from: String?, val to: String)
+
+/** Whole arrival length; the contest rule allows at most 3 seconds. */
+private const val ARRIVAL_MS = 2_600
+
+// Arrival phases as fractions of ARRIVAL_MS: the car drives, then the region fills, then the stamp lands.
+private const val DRIVE_END = 0.55f
+private const val FILL_END = 0.72f
+
+private fun phase(t: Float, start: Float, end: Float) = ((t - start) / (end - start)).coerceIn(0f, 1f)
+
+/** Fill alpha of the arriving region; without a previous stamp there is no drive and it fills at once. */
+private fun arrivalFill(t: Float, drives: Boolean) = if (drives) phase(t, DRIVE_END, FILL_END) else phase(t, 0f, 0.25f)
+
+/** Point on the same curve [drawRoute] uses between a and b, at s in 0..1. */
+private fun curvePoint(a: Offset, b: Offset, s: Float): Offset {
+  val c = Offset((a.x + b.x) / 2 - (b.y - a.y) * 0.2f, (a.y + b.y) / 2 + (b.x - a.x) * 0.2f)
+  val u = 1 - s
+  return a * (u * u) + c * (2 * u * s) + b * (s * s)
+}
+
+private fun DrawScope.drawArrival(from: Offset?, to: Offset, t: Float, textMeasurer: TextMeasurer) {
+  if (from != null && hypot(to.x - from.x, to.y - from.y) >= 1f) {
+    val s = FastOutSlowInEasing.transform(phase(t, 0f, DRIVE_END))
+    // The dotted line grows behind the car.
+    val steps = 48
+    val path = Path().apply {
+      moveTo(from.x, from.y)
+      for (i in 1..steps) curvePoint(from, to, s * i / steps).let { lineTo(it.x, it.y) }
+    }
+    val dots = PathEffect.dashPathEffect(floatArrayOf(0.01f, 15.dp.toPx()))
+    drawPath(path, Palette.MapShade.copy(alpha = 0.35f), style = Stroke(width = 10.dp.toPx(), cap = StrokeCap.Round, pathEffect = dots))
+    drawPath(path, Palette.OrderLine, style = Stroke(width = 7.dp.toPx(), cap = StrokeCap.Round, pathEffect = dots))
+    if (t < FILL_END) {
+      val p = curvePoint(from, to, s)
+      val ahead = curvePoint(from, to, (s + 0.02f).coerceAtMost(1f))
+      val back = curvePoint(from, to, (s - 0.02f).coerceAtLeast(0f))
+      val angle = Math.toDegrees(atan2((ahead.y - back.y).toDouble(), (ahead.x - back.x).toDouble())).toFloat()
+      drawCar(p, angle)
+    }
+  }
+  val stamp = phase(t, FILL_END, 1f)
+  if (stamp > 0f) {
+    val layout = textMeasurer.measure(
+      "STAMPED!",
+      TextStyle(color = Palette.StampedToday, fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp),
+    )
+    val pad = 12.dp.toPx()
+    val w = layout.size.width + pad * 2
+    val h = layout.size.height + pad
+    // Lands from a bigger size, slightly tilted like a rubber stamp; kept inside the canvas.
+    val scale = 1f + 0.6f * (1 - FastOutSlowInEasing.transform(stamp))
+    val center = Offset(
+      to.x.coerceIn(w / 2 + pad, size.width - w / 2 - pad),
+      (to.y - h).coerceIn(h / 2 + pad, size.height - h / 2 - pad),
+    )
+    withTransform({
+      rotate(-8f, center)
+      scale(scale, scale, center)
+    }) {
+      val topLeft = Offset(center.x - w / 2, center.y - h / 2)
+      drawRoundRect(Palette.MapLabel.copy(alpha = stamp), topLeft, Size(w, h), CornerRadius(10.dp.toPx()))
+      drawRoundRect(
+        Palette.StampedToday.copy(alpha = stamp), topLeft, Size(w, h), CornerRadius(10.dp.toPx()),
+        style = Stroke(width = 3.dp.toPx()),
+      )
+      drawText(layout, topLeft = Offset(center.x - layout.size.width / 2, center.y - layout.size.height / 2), alpha = stamp)
+    }
+  }
+}
+
+/** A small top-down car pointing along [degrees] (0 = east). */
+private fun DrawScope.drawCar(at: Offset, degrees: Float) {
+  val len = 30.dp.toPx()
+  val wid = 17.dp.toPx()
+  rotate(degrees, at) {
+    drawCircle(Palette.MapShade.copy(alpha = 0.35f), radius = len * 0.62f, center = at)
+    val body = Offset(at.x - len / 2, at.y - wid / 2)
+    drawRoundRect(Palette.StampedToday, body, Size(len, wid), CornerRadius(5.dp.toPx()))
+    drawRoundRect(Palette.OrderLine, body, Size(len, wid), CornerRadius(5.dp.toPx()), style = Stroke(width = 2.dp.toPx()))
+    // Windshield toward the front, rear window toward the back.
+    drawRoundRect(Palette.OrderLine.copy(alpha = 0.9f), Offset(at.x + len * 0.08f, at.y - wid * 0.32f), Size(len * 0.2f, wid * 0.64f), CornerRadius(2.dp.toPx()))
+    drawRoundRect(Palette.OrderLine.copy(alpha = 0.6f), Offset(at.x - len * 0.36f, at.y - wid * 0.28f), Size(len * 0.14f, wid * 0.56f), CornerRadius(2.dp.toPx()))
   }
 }
 
