@@ -21,9 +21,7 @@ class RegionIndex(val regions: List<Region>) {
 class RegionFinder(private val index: RegionIndex) {
   /** Returns null when the point is outside every region (sea, abroad). */
   fun find(latitude: Double, longitude: Double): Region? {
-    // TODO(border-correction): simplified borders can be off by tens of meters, so a point very close to
-    //  a border may resolve to the neighbor (or to nothing on a coastline). Correct that here, e.g. by
-    //  preferring the region already stamped today when the point is within a small tolerance of it.
+    // Plain polygon test. Check-ins go through BorderCorrection, which revisits points near a border.
     return index.regions.firstOrNull { it.contains(longitude, latitude) }
   }
 }

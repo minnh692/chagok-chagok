@@ -30,6 +30,9 @@ import com.chagokchagok.app.data.StampResult
 import com.chagokchagok.app.location.AndroidLocationSource
 import com.chagokchagok.app.location.LocationRead
 import com.chagokchagok.app.location.LocationSource
+import com.chagokchagok.app.location.AddressHintSource
+import com.chagokchagok.app.location.NaviHelperAddressHintSource
+import com.chagokchagok.app.region.BorderCorrection
 import com.chagokchagok.app.region.Region
 import com.chagokchagok.app.region.RegionAssets
 import com.chagokchagok.app.region.RegionFinder
@@ -90,6 +93,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
   private val restVisits = AppDatabase.get(app).restVisitDao()
   // The single place that decides where location comes from (see LocationSource).
   private val locationSource: LocationSource = AndroidLocationSource(app)
+  private val addressHints: AddressHintSource = NaviHelperAddressHintSource(app)
 
   val consent: StateFlow<LocationConsent> = consentStore.consent
 
@@ -470,9 +474,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _checkIn.value = collectRestArea(restArea, areas)
             return@launch
           }
-          val region = withContext(Dispatchers.Default) {
-            RegionFinder(regions).find(read.fix.latitude, read.fix.longitude)
-          }
+          val border = BorderCorrection(regions)
+          val lookup = withContext(Dispatchers.Default) { border.lookup(read.fix.latitude, read.fix.longitude) }
+          // Near a border the navigation's address decides (K-1); it is asked only then and never stored.
+          val region = if (lookup.nearBorder) border.resolve(lookup, addressHints.currentAddress()) else lookup.contained
           if (region == null) {
             CheckIn.OutsideRegions
           } else {
